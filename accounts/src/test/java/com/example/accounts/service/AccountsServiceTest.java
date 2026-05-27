@@ -1,0 +1,355 @@
+package com.example.accounts.service;
+
+import com.example.accounts.error.AccountNotFoundException;
+import com.example.accounts.model.AccountModel;
+import com.example.accounts.repository.AccountsRepository;
+import com.example.shared.client.NotificationsClient;
+import com.example.shared.dto.AccountDto;
+import com.example.shared.dto.AccountForTransferDto;
+import com.example.shared.dto.CreateAccountDto;
+import com.example.shared.dto.TransferMoneyDto;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class AccountsServiceTest {
+
+    @Mock
+    private AccountsRepository accountsRepository;
+
+    @Mock
+    private NotificationsClient notificationsClient;
+
+    @InjectMocks
+    private AccountsService accountsService;
+
+    @Test
+    void createAccountCreatesNewAccount() {
+        CreateAccountDto dto = new CreateAccountDto(
+                "John Smith",
+                LocalDate.now().minusYears(20)
+        );
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
+
+        accountsService.createAccount(dto, "john");
+
+        ArgumentCaptor<AccountModel> captor = ArgumentCaptor.forClass(AccountModel.class);
+        verify(accountsRepository).save(captor.capture());
+
+        AccountModel saved = captor.getValue();
+
+        assertEquals("john", saved.getLogin());
+        assertEquals("John", saved.getFirstName());
+        assertEquals("Smith", saved.getLastName());
+        assertEquals(dto.birthDate(), saved.getbirthDate());
+        assertEquals(0L, saved.getBalance());
+
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void createAccountUpdatesExistingAccount() {
+        AccountModel existing = new AccountModel(
+                "john",
+                "Old",
+                "Name",
+                LocalDate.of(1990, 1, 1)
+        );
+        existing.setBalance(999L);
+
+        CreateAccountDto dto = new CreateAccountDto(
+                "John Smith",
+                LocalDate.now().minusYears(25)
+        );
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(existing));
+
+        accountsService.createAccount(dto, "john");
+
+        verify(accountsRepository).save(existing);
+
+        assertEquals("John", existing.getFirstName());
+        assertEquals("Smith", existing.getLastName());
+        assertEquals(dto.birthDate(), existing.getbirthDate());
+        assertEquals(0L, existing.getBalance());
+
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void createAccountThrowsIfUserIsUnder18() {
+        CreateAccountDto dto = new CreateAccountDto(
+                "Teen User",
+                LocalDate.now().minusYears(17)
+        );
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.createAccount(dto, "teen")
+        );
+
+        assertEquals("User must be at least 18 years old", exception.getMessage());
+
+        verifyNoInteractions(accountsRepository);
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void getAccountByLoginReturnsAccountDto() {
+        AccountModel account = new AccountModel(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+        account.setBalance(100L);
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+
+        AccountDto result = accountsService.getAccountByLogin("john");
+
+        assertEquals("John", result.firstName());
+        assertEquals("Smith", result.lastName());
+        assertEquals(LocalDate.of(1990, 1, 1), result.birthDate());
+        assertEquals(100L, result.balance());
+    }
+
+    @Test
+    void getAccountByLoginThrowsIfAccountNotFound() {
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
+
+        assertThrows(
+                AccountNotFoundException.class,
+                () -> accountsService.getAccountByLogin("john")
+        );
+    }
+
+    @Test
+    void getAccountsForTransferReturnsOtherAccounts() {
+        AccountModel anna = new AccountModel(
+                "anna",
+                "Anna",
+                "Ivanova",
+                LocalDate.of(1995, 1, 1)
+        );
+
+        AccountModel petr = new AccountModel(
+                "petr",
+                "Petr",
+                "Petrov",
+                LocalDate.of(1993, 2, 2)
+        );
+
+        when(accountsRepository.findOtherAccountsByLogin("john"))
+                .thenReturn(List.of(anna, petr));
+
+        List<AccountForTransferDto> result =
+                accountsService.getAccountsForTransfer("john");
+
+        assertEquals(2, result.size());
+
+        assertEquals("anna", result.get(0).login());
+        assertEquals("Anna", result.get(0).firstName());
+        assertEquals("Ivanova", result.get(0).lastName());
+
+        assertEquals("petr", result.get(1).login());
+        assertEquals("Petr", result.get(1).firstName());
+        assertEquals("Petrov", result.get(1).lastName());
+
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void getBalanceReturnsBalance() {
+        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+
+        Long result = accountsService.getBalance("john");
+
+        assertEquals(100L, result);
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void putCashIncreasesBalance() {
+        AccountModel account = new AccountModel(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+        account.setBalance(100L);
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+
+        accountsService.putCash("john", 50L);
+
+        assertEquals(150L, account.getBalance());
+
+        verify(accountsRepository).save(account);
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void putCashThrowsIfAmountIsNotPositive() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.putCash("john", 0L)
+        );
+
+        assertEquals("Сумма должна быть больше нуля", exception.getMessage());
+
+        verifyNoInteractions(accountsRepository);
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void putCashThrowsIfAccountNotFound() {
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
+
+        assertThrows(
+                AccountNotFoundException.class,
+                () -> accountsService.putCash("john", 50L)
+        );
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void getCashDecreasesBalance() {
+        AccountModel account = new AccountModel(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+        account.setBalance(100L);
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+
+        accountsService.getCash("john", 40L);
+
+        assertEquals(60L, account.getBalance());
+
+        verify(accountsRepository).save(account);
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void getCashThrowsIfAmountIsNotPositive() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.getCash("john", -10L)
+        );
+
+        assertEquals("Сумма должна быть больше нуля", exception.getMessage());
+
+        verifyNoInteractions(accountsRepository);
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void transferMovesMoneyBetweenAccounts() {
+        AccountModel from = new AccountModel(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+        from.setBalance(100L);
+
+        AccountModel to = new AccountModel(
+                "anna",
+                "Anna",
+                "Ivanova",
+                LocalDate.of(1995, 1, 1)
+        );
+        to.setBalance(20L);
+
+        TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
+
+        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
+        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
+
+        accountsService.transfer("john", dto);
+
+        assertEquals(70L, from.getBalance());
+        assertEquals(50L, to.getBalance());
+
+        verify(accountsRepository).save(from);
+        verify(accountsRepository).save(to);
+        verify(notificationsClient).sendNotification(any());
+    }
+
+    @Test
+    void transferThrowsIfNotEnoughMoney() {
+        TransferMoneyDto dto = new TransferMoneyDto("anna", 300L);
+
+        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.transfer("john", dto)
+        );
+
+        assertEquals("Недостаточно средств", exception.getMessage());
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void transferThrowsIfSourceAccountNotFound() {
+        TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
+
+        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
+        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(new AccountModel()));
+
+        assertThrows(
+                AccountNotFoundException.class,
+                () -> accountsService.transfer("john", dto)
+        );
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void transferThrowsIfTargetAccountNotFound() {
+        AccountModel from = new AccountModel(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+        from.setBalance(100L);
+
+        TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
+
+        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
+        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.empty());
+
+        assertThrows(
+                AccountNotFoundException.class,
+                () -> accountsService.transfer("john", dto)
+        );
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+}
