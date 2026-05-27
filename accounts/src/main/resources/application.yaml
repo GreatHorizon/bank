@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: accounts
+
+  config:
+    import: "optional:consul:"
+
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+
+      discovery:
+        service-name: accounts
+
+      config:
+        enabled: true
+        default-context: application
+        prefixes:
+          - config
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            provider: keycloak
+            client-id: accounts-service
+            client-secret: ${CLIENT_SECRET}
+            scope: openid
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:9090/realms/master
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9090/realms/master
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db.changelog/db.changelog-master.yaml
+    url: ${DB_URL}
+    user: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    default-schema: accounts
+
+  logging:
+    level:
+      org.springframework.security: DEBUG
+      liquibase: DEBUG
+      org.springframework.web.client.RestClient: DEBUG
+      org.springframework.web.client.RestTemplate: DEBUG
