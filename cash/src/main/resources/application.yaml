@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: cash
+
+  config:
+    import: "optional:consul:"
+
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        service-name: cash
+      config:
+        enabled: true
+        prefix: config
+        defaultContext: application
+
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            provider: keycloak
+            client-id: cash-service
+            client-secret: ${CLIENT_SECRET}
+            scope: openid
+            authorization-grant-type: client_credentials
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:9090/realms/master
+
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9090/realms/master
+
+server:
+  port: 8081
+
+logging:
+  level:
+    org.springframework.web.client.RestClient: DEBUG
+    org.springframework.web.client.RestTemplate: DEBUG
+    org.springframework.security: DEBUG

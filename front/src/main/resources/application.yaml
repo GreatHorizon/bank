@@ -1,0 +1,45 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: front
+
+  config:
+    import: "optional:consul:"
+
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        service-name: front
+      config:
+        enabled: true
+        prefixes:
+          - config
+        default-context: application
+
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: front_client
+            client-secret: ${CLIENT_SECRET}
+            scope:
+              - openid
+              - profile
+              - email
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:9090/realms/master
+
+logging:
+  level:
+    org.springframework.web.client.RestClient: DEBUG
+    org.springframework.web.client.RestTemplate: DEBUG
+    org.springframework.security: DEBUG

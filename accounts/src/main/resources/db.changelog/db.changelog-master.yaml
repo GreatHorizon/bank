@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: 004-create-account-table.xml
+      relativeToChangelogFile: true
+  - include:
+      file: 005-add-account-login-unique-constraint.xml
+      relativeToChangelogFile: true
