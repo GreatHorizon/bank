@@ -1,0 +1,62 @@
+{{- range $key, $svc := .Values.services }}
+{{- if and $svc.db $svc.db.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $svc.db.name }}
+  labels:
+    app: {{ $svc.db.name }}
+spec:
+  serviceName: {{ $svc.db.name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $svc.db.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svc.db.name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ $svc.db.image }}
+
+          ports:
+            - name: postgres
+              containerPort: {{ $svc.db.port }}
+
+          env:
+            - name: POSTGRES_DB
+              value: {{ $svc.db.database | quote }}
+
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: username
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: password
+
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ $svc.db.storage }}
+---
+{{- end }}
+{{- end }}

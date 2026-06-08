@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    app: {{ .Values.gateway.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.gateway.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.gateway.name }}
+    spec:
+      containers:
+        - name: {{ .Values.gateway.name }}
+          image: {{ .Values.gateway.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.port }}
+
+          envFrom:
+            - configMapRef:
+                name: banking-global-config
+
+          env:
+            - name: SERVER_PORT
+              value: {{ .Values.gateway.port | quote }}
+
+            - name: ACCOUNTS_SERVICE_URL
+              value: "http://{{ .Values.services.accounts.name }}:{{ .Values.services.accounts.port }}"
+
+            - name: CASH_SERVICE_URL
+              value: "http://{{ .Values.services.cash.name }}:{{ .Values.services.cash.port }}"
+
+            - name: TRANSFER_SERVICE_URL
+              value: "http://{{ .Values.services.transfer.name }}:{{ .Values.services.transfer.port }}"
+
+            - name: NOTIFICATIONS_SERVICE_URL
+              value: "http://{{ .Values.services.notifications.name }}:{{ .Values.services.notifications.port }}"
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            failureThreshold: 6

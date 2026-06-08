@@ -1,0 +1,76 @@
+{{- range $key, $svc := .Values.services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $svc.name }}
+  labels:
+    app: {{ $svc.name }}
+spec:
+  replicas: {{ $svc.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $svc.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $svc.name }}
+    spec:
+      containers:
+        - name: {{ $svc.name }}
+          image: {{ $svc.image }}
+          imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+
+          envFrom:
+            - configMapRef:
+                name: banking-global-config
+
+          env:
+            - name: SERVER_PORT
+              value: {{ $svc.port | quote }}
+
+            {{- if $svc.keycloak }}
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.name }}-secret
+                  key: CLIENT_SECRET
+            {{- end }}
+
+            {{- if and $svc.db $svc.db.enabled }}
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ $svc.db.name }}:{{ $svc.db.port }}/{{ $svc.db.database }}"
+
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: username
+
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: password
+            {{- end }}
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 50
+            periodSeconds: 20
+            failureThreshold: 6
+---
+{{- end }}
