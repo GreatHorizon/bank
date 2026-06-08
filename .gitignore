@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+banking-backend-chart/values-local.yaml
+banking-backend-chart/values-secrets.yaml
