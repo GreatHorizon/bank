@@ -5,37 +5,21 @@ spring:
   application:
     name: gateway
 
-  config:
-    import: "optional:consul:"
-
   cloud:
-    consul:
-      host: localhost
-      port: 8500
-
-      discovery:
-        service-name: gateway
-
-      config:
-        enabled: true
-        prefixes:
-          - config
-        default-context: application
-
     gateway:
       server:
         webmvc:
           routes:
             - id: accounts_service_routes
-              uri: http://localhost:8080
+              uri: ${ACCOUNTS_SERVICE_URL}
               predicates:
                 - Path=/accounts,/accounts/**
             - id: cash_service_routes
-              uri: http://localhost:8081
+              uri: ${CASH_SERVICE_URL}
               predicates:
                 - Path=/api/cash,/api/cash/**
             - id: transfer_cash_service
-              uri: http://localhost:8083
+              uri: ${TRANSFER_SERVICE_URL}
               predicates:
                 - Path=/api/transfer, /api/transfer/**
 management:
@@ -43,3 +27,12 @@ management:
     web:
       exposure:
         include: health,info,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

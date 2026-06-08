@@ -38,7 +38,7 @@ public class NotificationsRestClientConfig {
         interceptor.setClientRegistrationIdResolver(request -> "keycloak");
 
         return RestClient.builder()
-                .baseUrl("http://localhost:8082")
+                .baseUrl("http://notifications-service:8080")
                 .requestInterceptor(interceptor)
                 .build();
     }

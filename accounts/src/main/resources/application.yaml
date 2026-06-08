@@ -1,26 +1,10 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
+
 
 spring:
   application:
     name: accounts
-
-  config:
-    import: "optional:consul:"
-
-  cloud:
-    consul:
-      host: localhost
-      port: 8500
-
-      discovery:
-        service-name: accounts
-
-      config:
-        enabled: true
-        default-context: application
-        prefixes:
-          - config
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -39,18 +23,18 @@ spring:
             authorization-grant-type: client_credentials
         provider:
           keycloak:
-            issuer-uri: http://localhost:9090/realms/master
+            issuer-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_ISSUER_URI}
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:9090/realms/master
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
 
   liquibase:
     enabled: true
     change-log: classpath:db.changelog/db.changelog-master.yaml
-    url: ${DB_URL}
-    user: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    default-schema: accounts
+    url: ${SPRING_DATASOURCE_URL}
+    user: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    default-schema: public
 
   logging:
     level:

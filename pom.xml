@@ -33,6 +33,7 @@
 
     <modules>
         <module>front</module>
+        <module>gateway</module>
         <module>cash</module>
         <module>accounts</module>
         <module>transfer</module>
