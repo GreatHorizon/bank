@@ -30,7 +30,9 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration," +
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration," +
                 "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration," +
-                "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration"
+                "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
+
 })
 @AutoConfigureStubRunner(
         ids = "com.example:accounts:+:stubs:8081",

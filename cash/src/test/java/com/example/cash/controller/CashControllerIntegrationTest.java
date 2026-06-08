@@ -37,7 +37,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration," +
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration," +
                 "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration," +
-                "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration"
+                "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
+
 })
 @AutoConfigureMockMvc
 class CashControllerIntegrationTest {

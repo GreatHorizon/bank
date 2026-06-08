@@ -35,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.cloud.consul.enabled=false",
         "spring.cloud.consul.config.enabled=false",
         "spring.cloud.consul.config.import-check.enabled=false",
-        "spring.cloud.discovery.enabled=false"
+        "spring.cloud.discovery.enabled=false",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
 })
 @AutoConfigureMockMvc
 class TransferControllerIntegrationTest {
