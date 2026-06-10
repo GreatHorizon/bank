@@ -1,0 +1,146 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'SERVICE_NAME',
+            choices: [
+                'accounts',
+                'cash',
+                'transfer',
+                'notifications',
+                'gateway'
+            ],
+            description: 'Microservice to build and deploy'
+        )
+
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['test', 'prod'],
+            description: 'Target Kubernetes environment'
+        )
+
+        booleanParam(
+            name: 'RUN_DEPLOY',
+            defaultValue: true,
+            description: 'Deploy service with Helm'
+        )
+    }
+
+    environment {
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        DOCKER_REGISTRY = "localhost:5000"
+        CHART_PATH = "./banking-backend-chart"
+        RELEASE_NAME = "banking-backend"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                sh 'mvn -version'
+                sh 'helm lint ./banking-backend-chart'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def imageName = params.SERVICE_NAME == 'notifications'
+                        ? 'notifications-service'
+                        : params.SERVICE_NAME == 'gateway'
+                            ? 'gateway'
+                            : "${params.SERVICE_NAME}-service"
+
+                    def serviceDir = params.SERVICE_NAME
+
+                    sh """
+                        docker build --no-cache \
+                          -t ${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG} \
+                          ./${serviceDir}
+                    """
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    def imageName = params.SERVICE_NAME == 'notifications'
+                        ? 'notifications-service'
+                        : params.SERVICE_NAME == 'gateway'
+                            ? 'gateway'
+                            : "${params.SERVICE_NAME}-service"
+
+                    sh "docker push ${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                script {
+                    def valuesFile = params.ENVIRONMENT == 'prod'
+                        ? './banking-backend-chart/values-prod.yaml'
+                        : './banking-backend-chart/values-test.yaml'
+
+                    def imageName = params.SERVICE_NAME == 'notifications'
+                        ? 'notifications-service'
+                        : params.SERVICE_NAME == 'gateway'
+                            ? 'gateway'
+                            : "${params.SERVICE_NAME}-service"
+
+                    def helmImageKey = params.SERVICE_NAME == 'gateway'
+                        ? 'gateway.image'
+                        : "services.${params.SERVICE_NAME}.image"
+
+                    sh """
+                        helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                          -f ${CHART_PATH}/values.yaml \
+                          -f ${valuesFile} \
+                          --set ${helmImageKey}=${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        stage('Helm Tests') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh "helm test ${RELEASE_NAME} --logs"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Service ${params.SERVICE_NAME} deployed successfully to ${params.ENVIRONMENT}"
+        }
+
+        failure {
+            echo "Pipeline failed for service ${params.SERVICE_NAME}"
+        }
+    }
+}
