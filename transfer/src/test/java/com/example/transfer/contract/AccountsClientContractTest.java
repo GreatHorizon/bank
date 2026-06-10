@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 })
 @AutoConfigureStubRunner(
-        ids = "com.example:accounts:+:stubs:8081",
+        ids = "com.example:accounts:0.0.1-SNAPSHOT:stubs:8081",
         stubsMode = StubRunnerProperties.StubsMode.LOCAL
 )
 class AccountsClientContractTest {
