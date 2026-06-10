@@ -42,6 +42,13 @@ pipeline {
             }
         }
 
+        stage('Install Accounts Stubs') {
+                steps {
+                    sh 'mvn -pl accounts clean install -DskipTests'
+                    sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
+                }
+        }
+
         stage('Test All') {
             steps {
                 sh 'mvn clean test'
