@@ -42,18 +42,18 @@ pipeline {
             }
         }
 
-        stage('Install Accounts Stubs') {
-                steps {
-                    sh 'mvn -pl accounts clean install -DskipTests'
-                    sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
-                }
-        }
+      stage('Install Accounts Stubs') {
+          steps {
+              sh 'mvn -pl accounts -am clean install -DskipTests'
+              sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
+          }
+      }
 
-        stage('Test All') {
-            steps {
-                sh 'mvn clean test'
-            }
-        }
+      stage('Build and Test') {
+          steps {
+              sh 'mvn clean install'
+          }
+      }
 
         stage('Build Docker Images') {
             parallel {
