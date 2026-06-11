@@ -97,30 +97,33 @@ pipeline {
             }
         }
 
-        stage('Deploy to Kubernetes') {
-          when {
-              expression { return params.RUN_DEPLOY }
-          }
-          steps {
-              script {
-                  def valuesFile = params.ENVIRONMENT == 'prod'
-                      ? './banking-backend-chart/values-prod.yaml'
-                      : './banking-backend-chart/values-test.yaml'
-
-                  sh """
-                      helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
-                        -f ${CHART_PATH}/values.yaml \
-                        -f ${valuesFile} \
-                        --set global.imagePullPolicy=Never \
-                        --set gateway.image=${GATEWAY_IMAGE} \
-                        --set services.accounts.image=${ACCOUNTS_IMAGE} \
-                        --set services.cash.image=${CASH_IMAGE} \
-                        --set services.transfer.image=${TRANSFER_IMAGE} \
-                        --set services.notifications.image=${NOTIFICATIONS_IMAGE}
-                  """
-              }
-          }
-        }
+       stage('Deploy to Kubernetes') {
+           when {
+               expression { return params.RUN_DEPLOY }
+           }
+           steps {
+               script {
+                   def secretCredentialId = params.ENVIRONMENT == 'prod'
+                       ? 'helm-values-prod'
+                       : 'helm-values-test'
+                   withCredentials([
+                       file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
+                   ]) {
+                       sh """
+                           helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                             -f ${CHART_PATH}/values.yaml \
+                             -f ${SECRET_VALUES_FILE} \
+                             --set global.imagePullPolicy=Never \
+                             --set gateway.image=${GATEWAY_IMAGE} \
+                             --set services.accounts.image=${ACCOUNTS_IMAGE} \
+                             --set services.cash.image=${CASH_IMAGE} \
+                             --set services.transfer.image=${TRANSFER_IMAGE} \
+                             --set services.notifications.image=${NOTIFICATIONS_IMAGE}
+                       """
+                   }
+               }
+           }
+       }
 
         stage('Helm Tests') {
             when {
