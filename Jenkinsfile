@@ -25,6 +25,7 @@ pipeline {
         NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
         GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
 
+        KUBECONFIG = "/var/jenkins_home/.kube/config"
         TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
     }
 
