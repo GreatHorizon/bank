@@ -17,7 +17,7 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
-        DOCKER_REGISTRY = "localhost:5000"
+        DOCKER_REGISTRY = "registry:5000"
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
     }
