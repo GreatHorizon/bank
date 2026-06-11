@@ -29,9 +29,11 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
-        DOCKER_REGISTRY = "localhost:5000"
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
+
+        KUBECONFIG = "/var/jenkins_home/.kube/config"
+        TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
     }
 
     stages {
@@ -41,56 +43,59 @@ pipeline {
             }
         }
 
+        stage('Resolve Service Metadata') {
+            steps {
+                script {
+                    env.SERVICE_DIR = params.SERVICE_NAME
+
+                    if (params.SERVICE_NAME == 'gateway') {
+                        env.IMAGE_NAME = 'gateway'
+                        env.HELM_IMAGE_KEY = 'gateway.image'
+                    } else if (params.SERVICE_NAME == 'notifications') {
+                        env.IMAGE_NAME = 'notifications-service'
+                        env.HELM_IMAGE_KEY = 'services.notifications.image'
+                    } else {
+                        env.IMAGE_NAME = "${params.SERVICE_NAME}-service"
+                        env.HELM_IMAGE_KEY = "services.${params.SERVICE_NAME}.image"
+                    }
+
+                    env.SERVICE_IMAGE = "local/${env.IMAGE_NAME}:${BUILD_NUMBER}"
+                }
+            }
+        }
+
         stage('Validate') {
             steps {
                 sh 'mvn -version'
-                sh 'helm lint ./banking-backend-chart'
+                sh "helm lint ${CHART_PATH}"
             }
         }
 
-        stage('Build') {
+        stage('Install Accounts Stubs') {
+            when {
+                expression { return params.SERVICE_NAME == 'cash' || params.SERVICE_NAME == 'transfer' }
+            }
             steps {
-                sh 'mvn clean package -DskipTests'
+                sh 'mvn -pl accounts -am clean install -DskipTests'
+                sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
             }
         }
 
-        stage('Test') {
+        stage('Build and Test Service') {
             steps {
-                sh 'mvn clean test'
+                script {
+                    if (params.SERVICE_NAME == 'gateway') {
+                        sh 'mvn -pl gateway -am clean install'
+                    } else {
+                        sh "mvn -pl ${params.SERVICE_NAME} -am clean install"
+                    }
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    def imageName = params.SERVICE_NAME == 'notifications'
-                        ? 'notifications-service'
-                        : params.SERVICE_NAME == 'gateway'
-                            ? 'gateway'
-                            : "${params.SERVICE_NAME}-service"
-
-                    def serviceDir = params.SERVICE_NAME
-
-                    sh """
-                        docker build --no-cache \
-                          -t ${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG} \
-                          ./${serviceDir}
-                    """
-                }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                script {
-                    def imageName = params.SERVICE_NAME == 'notifications'
-                        ? 'notifications-service'
-                        : params.SERVICE_NAME == 'gateway'
-                            ? 'gateway'
-                            : "${params.SERVICE_NAME}-service"
-
-                    sh "docker push ${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG}"
-                }
+                sh "docker build --no-cache -t ${SERVICE_IMAGE} ./${SERVICE_DIR}"
             }
         }
 
@@ -100,26 +105,21 @@ pipeline {
             }
             steps {
                 script {
-                    def valuesFile = params.ENVIRONMENT == 'prod'
-                        ? './banking-backend-chart/values-prod.yaml'
-                        : './banking-backend-chart/values-test.yaml'
+                    def secretCredentialId = params.ENVIRONMENT == 'prod'
+                        ? 'helm-values-prod'
+                        : 'helm-values-test'
 
-                    def imageName = params.SERVICE_NAME == 'notifications'
-                        ? 'notifications-service'
-                        : params.SERVICE_NAME == 'gateway'
-                            ? 'gateway'
-                            : "${params.SERVICE_NAME}-service"
-
-                    def helmImageKey = params.SERVICE_NAME == 'gateway'
-                        ? 'gateway.image'
-                        : "services.${params.SERVICE_NAME}.image"
-
-                    sh """
-                        helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
-                          -f ${CHART_PATH}/values.yaml \
-                          -f ${valuesFile} \
-                          --set ${helmImageKey}=${DOCKER_REGISTRY}/${imageName}:${IMAGE_TAG}
-                    """
+                    withCredentials([
+                        file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
+                    ]) {
+                        sh """
+                            helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
+                              --set global.imagePullPolicy=Never \
+                              --set ${HELM_IMAGE_KEY}=${SERVICE_IMAGE}
+                        """
+                    }
                 }
             }
         }
@@ -129,7 +129,7 @@ pipeline {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh "helm test ${RELEASE_NAME} --logs"
+                sh "helm test ${RELEASE_NAME} --timeout 30s"
             }
         }
     }
