@@ -20,6 +20,6 @@ spec:
 
           echo "Testing Keycloak issuer..."
 
-          curl -f -s {{ .Values.global.keycloak.issuerUri }}/.well-known/openid-configuration
+          curl -f -v {{ .Values.global.keycloak.issuerUri }}/.well-known/openid-configuration
 
           echo "Keycloak reachable OK"
