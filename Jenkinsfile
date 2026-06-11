@@ -17,9 +17,13 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
-        DOCKER_REGISTRY = "registry:5000"
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
+        ACCOUNTS_IMAGE = "local/accounts-service:${BUILD_NUMBER}"
+        CASH_IMAGE = "local/cash-service:${BUILD_NUMBER}"
+        TRANSFER_IMAGE = "local/transfer-service:${BUILD_NUMBER}"
+        NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
+        GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
     }
 
     stages {
@@ -42,129 +46,77 @@ pipeline {
             }
         }
 
-      stage('Install Accounts Stubs') {
+        stage('Install Accounts Stubs') {
           steps {
               sh 'mvn -pl accounts -am clean install -DskipTests'
               sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
           }
-      }
+        }
 
-      stage('Build and Test') {
+        stage('Build and Test') {
           steps {
               sh 'mvn clean install'
           }
-      }
+        }
+
 
         stage('Build Docker Images') {
             parallel {
                 stage('accounts-service') {
                     steps {
-                        sh """
-                            docker build --no-cache \
-                              -t ${DOCKER_REGISTRY}/accounts-service:${IMAGE_TAG} \
-                              ./accounts
-                        """
+                        sh "docker build --no-cache -t ${ACCOUNTS_IMAGE} ./accounts"
                     }
                 }
 
                 stage('cash-service') {
                     steps {
-                        sh """
-                            docker build --no-cache \
-                              -t ${DOCKER_REGISTRY}/cash-service:${IMAGE_TAG} \
-                              ./cash
-                        """
+                        sh "docker build --no-cache -t ${CASH_IMAGE} ./cash"
                     }
                 }
 
                 stage('transfer-service') {
                     steps {
-                        sh """
-                            docker build --no-cache \
-                              -t ${DOCKER_REGISTRY}/transfer-service:${IMAGE_TAG} \
-                              ./transfer
-                        """
+                        sh "docker build --no-cache -t ${TRANSFER_IMAGE} ./transfer"
                     }
                 }
 
                 stage('notifications-service') {
                     steps {
-                        sh """
-                            docker build --no-cache \
-                              -t ${DOCKER_REGISTRY}/notifications-service:${IMAGE_TAG} \
-                              ./notifications
-                        """
+                        sh "docker build --no-cache -t ${NOTIFICATIONS_IMAGE} ./notifications"
                     }
                 }
 
                 stage('gateway') {
                     steps {
-                        sh """
-                            docker build --no-cache \
-                              -t ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} \
-                              ./gateway
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Push Docker Images') {
-            parallel {
-                stage('Push accounts-service') {
-                    steps {
-                        sh "docker push ${DOCKER_REGISTRY}/accounts-service:${IMAGE_TAG}"
-                    }
-                }
-
-                stage('Push cash-service') {
-                    steps {
-                        sh "docker push ${DOCKER_REGISTRY}/cash-service:${IMAGE_TAG}"
-                    }
-                }
-
-                stage('Push transfer-service') {
-                    steps {
-                        sh "docker push ${DOCKER_REGISTRY}/transfer-service:${IMAGE_TAG}"
-                    }
-                }
-
-                stage('Push notifications-service') {
-                    steps {
-                        sh "docker push ${DOCKER_REGISTRY}/notifications-service:${IMAGE_TAG}"
-                    }
-                }
-
-                stage('Push gateway') {
-                    steps {
-                        sh "docker push ${DOCKER_REGISTRY}/gateway:${IMAGE_TAG}"
+                        sh "docker build --no-cache -t ${GATEWAY_IMAGE} ./gateway"
                     }
                 }
             }
         }
 
         stage('Deploy to Kubernetes') {
-            when {
-                expression { return params.RUN_DEPLOY }
-            }
-            steps {
-                script {
-                    def valuesFile = params.ENVIRONMENT == 'prod'
-                        ? './banking-backend-chart/values-prod.yaml'
-                        : './banking-backend-chart/values-test.yaml'
+          when {
+              expression { return params.RUN_DEPLOY }
+          }
+          steps {
+              script {
+                  def valuesFile = params.ENVIRONMENT == 'prod'
+                      ? './banking-backend-chart/values-prod.yaml'
+                      : './banking-backend-chart/values-test.yaml'
 
-                    sh """
-                        helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
-                          -f ${CHART_PATH}/values.yaml \
-                          -f ${valuesFile} \
-                          --set gateway.image=${DOCKER_REGISTRY}/gateway:${IMAGE_TAG} \
-                          --set services.accounts.image=${DOCKER_REGISTRY}/accounts-service:${IMAGE_TAG} \
-                          --set services.cash.image=${DOCKER_REGISTRY}/cash-service:${IMAGE_TAG} \
-                          --set services.transfer.image=${DOCKER_REGISTRY}/transfer-service:${IMAGE_TAG} \
-                          --set services.notifications.image=${DOCKER_REGISTRY}/notifications-service:${IMAGE_TAG}
-                    """
-                }
-            }
+                  sh """
+                      helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                        -f ${CHART_PATH}/values.yaml \
+                        -f ${valuesFile} \
+                        --set global.imagePullPolicy=Never \
+                        --set gateway.image=${GATEWAY_IMAGE} \
+                        --set services.accounts.image=${ACCOUNTS_IMAGE} \
+                        --set services.cash.image=${CASH_IMAGE} \
+                        --set services.transfer.image=${TRANSFER_IMAGE} \
+                        --set services.notifications.image=${NOTIFICATIONS_IMAGE}
+                  """
+              }
+          }
         }
 
         stage('Helm Tests') {
