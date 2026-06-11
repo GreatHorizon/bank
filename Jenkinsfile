@@ -24,6 +24,8 @@ pipeline {
         TRANSFER_IMAGE = "local/transfer-service:${BUILD_NUMBER}"
         NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
         GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
+
+        TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
     }
 
     stages {
