@@ -1,0 +1,6 @@
+apiVersion: v2
+name: banking-backend
+description: Helm chart for Spring Boot banking microservices with NodePort gateway
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -26,10 +26,12 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.cloud.consul.config.enabled=false",
         "spring.cloud.consul.config.import-check.enabled=false",
         "spring.cloud.discovery.enabled=false",
-        "accounts.base-url=http://localhost:8081"
+        "accounts.base-url=http://localhost:8081",
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
+
 })
 @AutoConfigureStubRunner(
-        ids = "com.example:accounts:+:stubs:8081",
+        ids = "com.example:accounts:0.0.1-SNAPSHOT:stubs:8081",
         stubsMode = StubRunnerProperties.StubsMode.LOCAL
 )
 class AccountsClientContractTest {

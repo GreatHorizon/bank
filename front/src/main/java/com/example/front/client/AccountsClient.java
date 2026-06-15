@@ -22,7 +22,7 @@ public class AccountsClient {
     public AccountsClient(OAuth2AuthorizedClientService authorizedClientService) {
         this.authorizedClientService = authorizedClientService;
         this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:8085")
+                .baseUrl("http://localhost:30080")
                 .build();
     }
 

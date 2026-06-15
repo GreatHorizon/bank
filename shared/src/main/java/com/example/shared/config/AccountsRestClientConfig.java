@@ -16,7 +16,7 @@ public class AccountsRestClientConfig {
 
     @Bean
     public RestClient accountsRestClient(
-            @Value("${accounts.base-url:http://localhost:8080}") String accountsBaseUrl,
+            @Value("${accounts.base-url:http://accounts-service:8080}") String accountsBaseUrl,
             ClientRegistrationRepository clientRegistrationRepository,
             OAuth2AuthorizedClientService authorizedClientService
     ) {

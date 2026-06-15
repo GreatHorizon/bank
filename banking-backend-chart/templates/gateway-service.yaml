@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    app: {{ .Values.gateway.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.gateway.service.type }}
+  selector:
+    app: {{ .Values.gateway.name }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.gateway.service.port }}
+      targetPort: {{ .Values.gateway.port }}
+      nodePort: {{ .Values.gateway.service.nodePort }}

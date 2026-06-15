@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-services-health"
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}-test-services-health"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+
+          echo "Testing accounts-service..."
+          curl -f -s http://{{ .Values.services.accounts.name }}:{{ .Values.services.accounts.port }}/actuator/health
+
+          echo "Testing cash-service..."
+          curl -f -s http://{{ .Values.services.cash.name }}:{{ .Values.services.cash.port }}/actuator/health
+
+          echo "Testing transfer-service..."
+          curl -f -s http://{{ .Values.services.transfer.name }}:{{ .Values.services.transfer.port }}/actuator/health
+
+          echo "Testing notifications-service..."
+          curl -f -s http://{{ .Values.services.notifications.name }}:{{ .Values.services.notifications.port }}/actuator/health
+
+          echo "All service health checks OK"

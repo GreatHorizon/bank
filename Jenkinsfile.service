@@ -1,0 +1,146 @@
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'SERVICE_NAME',
+            choices: [
+                'accounts',
+                'cash',
+                'transfer',
+                'notifications',
+                'gateway'
+            ],
+            description: 'Microservice to build and deploy'
+        )
+
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['test', 'prod'],
+            description: 'Target Kubernetes environment'
+        )
+
+        booleanParam(
+            name: 'RUN_DEPLOY',
+            defaultValue: true,
+            description: 'Deploy service with Helm'
+        )
+    }
+
+    environment {
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        CHART_PATH = "./banking-backend-chart"
+        RELEASE_NAME = "banking-backend"
+
+        KUBECONFIG = "/var/jenkins_home/.kube/config"
+        TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Resolve Service Metadata') {
+            steps {
+                script {
+                    env.SERVICE_DIR = params.SERVICE_NAME
+
+                    if (params.SERVICE_NAME == 'gateway') {
+                        env.IMAGE_NAME = 'gateway'
+                        env.HELM_IMAGE_KEY = 'gateway.image'
+                    } else if (params.SERVICE_NAME == 'notifications') {
+                        env.IMAGE_NAME = 'notifications-service'
+                        env.HELM_IMAGE_KEY = 'services.notifications.image'
+                    } else {
+                        env.IMAGE_NAME = "${params.SERVICE_NAME}-service"
+                        env.HELM_IMAGE_KEY = "services.${params.SERVICE_NAME}.image"
+                    }
+
+                    env.SERVICE_IMAGE = "local/${env.IMAGE_NAME}:${BUILD_NUMBER}"
+                }
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                sh 'mvn -version'
+                sh "helm lint ${CHART_PATH}"
+            }
+        }
+
+        stage('Install Accounts Stubs') {
+            when {
+                expression { return params.SERVICE_NAME == 'cash' || params.SERVICE_NAME == 'transfer' }
+            }
+            steps {
+                sh 'mvn -pl accounts -am clean install -DskipTests'
+                sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
+            }
+        }
+
+        stage('Build and Test Service') {
+            steps {
+                script {
+                    if (params.SERVICE_NAME == 'gateway') {
+                        sh 'mvn -pl gateway -am clean install'
+                    } else {
+                        sh "mvn -pl ${params.SERVICE_NAME} -am clean install"
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build --no-cache -t ${SERVICE_IMAGE} ./${SERVICE_DIR}"
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                script {
+                    def secretCredentialId = params.ENVIRONMENT == 'prod'
+                        ? 'helm-values-prod'
+                        : 'helm-values-test'
+
+                    withCredentials([
+                        file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
+                    ]) {
+                        sh """
+                            helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
+                              --set global.imagePullPolicy=Never \
+                              --set ${HELM_IMAGE_KEY}=${SERVICE_IMAGE}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Helm Tests') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh "helm test ${RELEASE_NAME} --timeout 30s"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Service ${params.SERVICE_NAME} deployed successfully to ${params.ENVIRONMENT}"
+        }
+
+        failure {
+            echo "Pipeline failed for service ${params.SERVICE_NAME}"
+        }
+    }
+}

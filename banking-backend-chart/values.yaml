@@ -1,0 +1,61 @@
+global:
+  environment: k8s
+  imagePullPolicy: IfNotPresent
+
+  keycloak:
+    issuerUri: ""
+    jwkSetUri: ""
+
+gateway:
+  name: gateway
+  image: gateway:1.0.0
+  port: 8080
+  replicas: 1
+
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+
+services:
+  accounts:
+    name: accounts-service
+    image: accounts-service:1.0.0
+    port: 8080
+    replicas: 1
+    keycloak:
+      clientSecret: ""
+    db:
+      enabled: true
+      name: accounts-db
+      image: postgres:16
+      port: 5432
+      database: accountsdb
+      username: ""
+      password: ""
+      storage: 2Gi
+
+
+  cash:
+    name: cash-service
+    image: cash-service:1.0.0
+    port: 8080
+    replicas: 1
+    keycloak:
+      clientSecret: ""
+
+  transfer:
+    name: transfer-service
+    image: transfer-service:1.0.0
+    port: 8080
+    replicas: 1
+    keycloak:
+      clientSecret: ""
+
+  notifications:
+    name: notifications-service
+    image: notifications-service:1.0.0
+    port: 8080
+    replicas: 1
+    keycloak:
+      clientSecret: ""

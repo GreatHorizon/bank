@@ -1,18 +1,6 @@
 spring:
   application:
-    name: transfer            # Логическое имя сервиса
-  config:
-    import: "optional:consul:"
-  cloud:
-    consul:
-      host: localhost          # Адрес Consul (по умолчанию localhost)
-      port: 8500               # Порт Consul (8500 по умолчанию)
-      discovery:
-        service-name: transfer  # Необязательно, по умолчанию берётся spring.application.name
-      config:
-        enabled: true            # Включаем Consul Config для внешней конфигурации
-        prefix: config           # Префикс в KV-хранилище Consul (по умолчанию "config")
-        defaultContext: application  # Контекст по умолчанию
+    name: transfer
   security:
     oauth2:
       client:
@@ -25,9 +13,9 @@ spring:
             authorization-grant-type: client_credentials
         provider:
           keycloak:
-            issuer-uri: http://localhost:9090/realms/master
+            issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:9090/realms/master
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}
