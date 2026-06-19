@@ -16,8 +16,6 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().denyAll()
-                )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}))
-                .build();
+                ).build();
     }
 }
