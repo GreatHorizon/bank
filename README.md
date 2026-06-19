@@ -1,6 +1,6 @@
 # Banking Microservices
 
-Проект представляет собой набор банковских микросервисов на Spring Boot, которые разворачиваются в Kubernetes через Helm. Keycloak используется как внешний Identity Provider, а Gateway является единной точкой входа в backend.
+Проект представляет собой набор банковских микросервисов на Spring Boot, которые разворачиваются в Kubernetes через Helm. Keycloak используется как внешний Identity Provider, Gateway является единной точкой входа в backend, а Kafka используется для событий уведомлений между сервисами.
 
 ## Состав проекта
 
@@ -8,8 +8,9 @@
 - `accounts` — сервис счетов, работает с PostgreSQL.
 - `cash` — сервис операций с наличными.
 - `transfer` — сервис переводов.
-- `notifications` — сервис уведомлений.
-- `shared` — общий модуль с клиентами, DTO и общей логикой.
+- `notifications` — сервис уведомлений, Kafka consumer для событий из `accounts`, `cash` и `transfer`.
+- `shared` — общий модуль с клиентами, DTO и общей логикой, включая Kafka `NotificationsClient`.
+- Kafka — брокер сообщений внутри Kubernetes, используется для событий уведомлений.
 - `banking-backend-chart` — Helm chart для развёртывания backend-сервисов в Kubernetes.
 - `front` — frontend, запускается локально вне Kubernetes.
 - Keycloak — запускается локально вне Kubernetes.
@@ -39,7 +40,7 @@ helm version
 
 ## Архитектура локального запуска
 
-В локальной среде backend-сервисы запускаются в Kubernetes, а Keycloak и frontend запускаются вне Kubernetes на хост-машине.
+В локальной среде backend-сервисы, PostgreSQL и Kafka запускаются в Kubernetes, а Keycloak и frontend запускаются вне Kubernetes на хост-машине.
 
 Основные URL:
 
@@ -47,6 +48,7 @@ helm version
 Gateway:  http://localhost:30080
 Keycloak: http://localhost:9090
 Frontend: http://localhost:3000
+Kafka:   kafka:9092 внутри Kubernetes
 ```
 
 Сервисы внутри Kubernetes обращаются к Keycloak не через `localhost`, а через IP-адрес хоста, например:
@@ -226,9 +228,32 @@ global:
   frontend:
     origin: "http://localhost:3000"
 
+  kafka:
+    enabled: true
+    name: kafka
+    image: apache/kafka:3.7.1
+    imagePullPolicy: IfNotPresent
+    port: 9092
+    controllerPort: 9093
+    storage: 2Gi
+    topics:
+      accountsEvents: accounts-events
+      cashEvents: cash-events
+      transferEvents: transfer-events
+    topicDefinitions:
+      - name: accounts-events
+        partitions: 1
+        replicationFactor: 1
+      - name: cash-events
+        partitions: 1
+        replicationFactor: 1
+      - name: transfer-events
+        partitions: 1
+        replicationFactor: 1
+
 gateway:
   name: gateway
-  image: gateway:1.0.0
+  image: gateway:1.0.1
   port: 8080
   replicas: 1
 
@@ -240,11 +265,15 @@ gateway:
 services:
   accounts:
     name: accounts-service
-    image: accounts-service:1.0.0
+    image: accounts-service:1.0.1
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: accounts-events
+      producer:
+        enabled: true
     db:
       enabled: true
       name: accounts-db
@@ -257,23 +286,31 @@ services:
 
   cash:
     name: cash-service
-    image: cash-service:1.0.0
+    image: cash-service:1.0.1
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: cash-events
+      producer:
+        enabled: true
 
   transfer:
     name: transfer-service
-    image: transfer-service:1.0.0
+    image: transfer-service:1.0.1
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: transfer-events
+      producer:
+        enabled: true
 
   notifications:
     name: notifications-service
-    image: notifications-service:1.0.0
+    image: notifications-service:1.0.2
     port: 8080
     replicas: 1
     keycloak:
@@ -342,6 +379,7 @@ kubectl get configmap
 
 ```text
 accounts-db-0            1/1 Running
+kafka-0                  1/1 Running
 accounts-service         1/1 Running
 cash-service             1/1 Running
 gateway                  1/1 Running
@@ -361,6 +399,53 @@ http://localhost:30080
 curl http://localhost:30080/actuator/health
 ```
 
+## Kafka в Kubernetes
+
+Kafka разворачивается Helm chart'ом как `StatefulSet` с именем `kafka`. Для Kafka создаётся `ClusterIP` service `kafka:9092`, а данные брокера хранятся в PVC, смонтированном в `/tmp/kraft-combined-logs`.
+
+После `helm upgrade --install` Helm hook job `banking-backend-kafka-topics` создаёт topics из `global.kafka.topicDefinitions`:
+
+```text
+accounts-events
+cash-events
+transfer-events
+```
+
+Проверить Kafka pod:
+
+```bash
+kubectl get pod kafka-0
+kubectl logs kafka-0 --tail=100
+```
+
+Проверить topics:
+
+```bash
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh   --bootstrap-server kafka:9092   --list
+```
+
+Описать topics:
+
+```bash
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh   --bootstrap-server kafka:9092   --describe
+```
+
+Создать topics вручную, если hook job не выполнился:
+
+```bash
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh   --bootstrap-server kafka:9092   --create --if-not-exists   --topic accounts-events   --partitions 1   --replication-factor 1
+
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh   --bootstrap-server kafka:9092   --create --if-not-exists   --topic cash-events   --partitions 1   --replication-factor 1
+
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh   --bootstrap-server kafka:9092   --create --if-not-exists   --topic transfer-events   --partitions 1   --replication-factor 1
+```
+
+Проверить consumer group сервиса уведомлений:
+
+```bash
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-consumer-groups.sh   --bootstrap-server kafka:9092   --describe   --group notifications-service
+```
+
 ## Проверка сервисов внутри Kubernetes
 
 Запустите временный curl pod:
@@ -378,6 +463,9 @@ curl http://cash-service:8080/actuator/health
 curl http://transfer-service:8080/actuator/health
 curl http://notifications-service:8080/actuator/health
 curl http://192.168.0.112:9090/realms/master/.well-known/openid-configuration
+
+# Kafka доступен не через curl, а через Kafka CLI в kafka pod:
+# kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
 ```
 
 Выход из pod:
@@ -393,6 +481,8 @@ exit
 ```bash
 helm test banking-backend
 ```
+
+Helm tests проверяют gateway health, health backend-сервисов, доступность Keycloak и Kafka/topics, если в chart добавлен `test-kafka-reachable.yaml` или `test-kafka-topics.yaml`.
 
 Не используйте `--logs`, если test pod'ы удаляются через hook delete policy. В этом случае Helm может завершиться с ошибкой, даже если один из тестов прошёл успешно:
 
@@ -593,8 +683,10 @@ Jenkinsfile должен выполнять следующие этапы:
 3. Build и tests
 4. Установка contract stubs, если нужны contract tests
 5. Сборка Docker images
-6. Deploy to Kubernetes через Helm
-7. Helm tests
+6. Deploy to Kubernetes через Helm, включая Kafka `StatefulSet`, Kafka service и hook job для topics
+7. Wait for Kubernetes rollouts
+8. Verify Kafka topics
+9. Helm tests
 
 Пример Jenkinsfile:
 
@@ -618,6 +710,7 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
+
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
 
@@ -626,6 +719,9 @@ pipeline {
         TRANSFER_IMAGE = "local/transfer-service:${BUILD_NUMBER}"
         NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
         GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
+
+        KAFKA_NAME = "kafka"
+        KAFKA_PORT = "9092"
 
         KUBECONFIG = "/var/jenkins_home/.kube/config"
         TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
@@ -709,15 +805,79 @@ pipeline {
                             helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
                               -f ${CHART_PATH}/values.yaml \
                               -f ${SECRET_VALUES_FILE} \
+                              --wait \
+                              --timeout 300s \
                               --set global.imagePullPolicy=Never \
+                              --set global.kafka.enabled=true \
+                              --set global.kafka.name=${KAFKA_NAME} \
+                              --set global.kafka.port=${KAFKA_PORT} \
                               --set gateway.image=${GATEWAY_IMAGE} \
                               --set services.accounts.image=${ACCOUNTS_IMAGE} \
+                              --set services.accounts.kafka.producer.enabled=true \
+                              --set services.accounts.kafka.topic=accounts-events \
                               --set services.cash.image=${CASH_IMAGE} \
+                              --set services.cash.kafka.producer.enabled=true \
+                              --set services.cash.kafka.topic=cash-events \
                               --set services.transfer.image=${TRANSFER_IMAGE} \
+                              --set services.transfer.kafka.producer.enabled=true \
+                              --set services.transfer.kafka.topic=transfer-events \
                               --set services.notifications.image=${NOTIFICATIONS_IMAGE}
                         """
                     }
                 }
+            }
+        }
+
+        stage('Wait for Rollouts') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    kubectl rollout status statefulset/${KAFKA_NAME} --timeout=180s
+
+                    kubectl rollout status deployment/accounts-service --timeout=180s
+                    kubectl rollout status deployment/cash-service --timeout=180s
+                    kubectl rollout status deployment/transfer-service --timeout=180s
+                    kubectl rollout status deployment/notifications-service
+kubectl rollout status statefulset/kafka --timeout=180s
+                    kubectl rollout status deployment/gateway --timeout=180s
+                """
+            }
+        }
+
+        stage('Verify Kafka Topics') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    echo "Waiting for Kafka topics job..."
+
+                    kubectl wait \
+                      --for=condition=complete \
+                      job/${RELEASE_NAME}-kafka-topics \
+                      --timeout=180s || true
+
+                    echo "Kafka topics:"
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^accounts-events$'
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^cash-events$'
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^transfer-events$'
+
+                    echo "Kafka topics OK"
+                """
             }
         }
 
@@ -726,7 +886,7 @@ pipeline {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh "helm test ${RELEASE_NAME} --timeout 30s"
+                sh "helm test ${RELEASE_NAME} --timeout 60s"
             }
         }
     }
@@ -738,6 +898,13 @@ pipeline {
 
         failure {
             echo "Umbrella pipeline failed"
+
+            sh """
+                kubectl get pods || true
+                kubectl get jobs || true
+                kubectl logs job/${RELEASE_NAME}-kafka-topics || true
+                kubectl logs statefulset/${KAFKA_NAME} || true
+            """
         }
     }
 }
@@ -776,6 +943,8 @@ kubectl logs deploy/accounts-service --tail=100
 kubectl logs deploy/cash-service --tail=100
 kubectl logs deploy/transfer-service --tail=100
 kubectl logs deploy/notifications-service --tail=100
+kubectl logs kafka-0 --tail=100
+kubectl logs job/banking-backend-kafka-topics --tail=100
 ```
 
 Перезапуск deployment:
@@ -786,6 +955,7 @@ kubectl rollout restart deployment/accounts-service
 kubectl rollout restart deployment/cash-service
 kubectl rollout restart deployment/transfer-service
 kubectl rollout restart deployment/notifications-service
+kubectl rollout restart statefulset/kafka
 ```
 
 Проверка rollout:
@@ -796,6 +966,7 @@ kubectl rollout status deployment/accounts-service
 kubectl rollout status deployment/cash-service
 kubectl rollout status deployment/transfer-service
 kubectl rollout status deployment/notifications-service
+kubectl rollout status statefulset/kafka
 ```
 
 Проверка Helm values, которые реально применены:
@@ -810,9 +981,21 @@ helm get values banking-backend --all
 helm uninstall banking-backend
 ```
 
+Проверка Kafka после deploy:
+
+```bash
+kubectl get statefulset kafka
+kubectl get svc kafka
+kubectl get job banking-backend-kafka-topics
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+kubectl exec -it kafka-0 -- /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:9092 --list
+```
+
 Удаление старых test pod'ов:
 
 ```bash
 kubectl delete pod banking-backend-test-keycloak-reachable --ignore-not-found
 kubectl delete pod banking-backend-test-gateway-health --ignore-not-found
+kubectl delete pod banking-backend-test-kafka-reachable --ignore-not-found
+kubectl delete pod banking-backend-test-kafka-topics --ignore-not-found
 ```
