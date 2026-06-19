@@ -1,0 +1,25 @@
+global:
+  environment: k8s
+  keycloak:
+    issuerUri: "http://192.168.0.112:9090/realms/master"
+    jwkSetUri: "http://192.168.0.112:9090/realms/master/protocol/openid-connect/certs"
+services:
+  accounts:
+    db:
+      username: "accountsuser"
+      password: "accountspass"
+
+    keycloak:
+      clientSecret: "obng1R69tJxldSA9uqT27ZEwNPqXbfT6"
+
+  cash:
+    keycloak:
+      clientSecret: "IdFDk4tYLQw5fPrWeq6BFPOOQnoKCLSM"
+
+  transfer:
+    keycloak:
+      clientSecret: "2soEHQBClJj6oxqdR5BjgxRGkNdt9pwS"
+
+  notifications:
+    keycloak:
+      clientSecret: "n8p8r5YI7jpfG1BmRl202nakq1GKc2pl"

@@ -1,0 +1,19 @@
+{{- if .Values.global.kafka.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.kafka.name }}
+  labels:
+    app: {{ .Values.global.kafka.name }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ .Values.global.kafka.name }}
+  ports:
+    - name: kafka
+      port: {{ .Values.global.kafka.port }}
+      targetPort: kafka
+    - name: controller
+      port: {{ .Values.global.kafka.controllerPort }}
+      targetPort: controller
+{{- end }}

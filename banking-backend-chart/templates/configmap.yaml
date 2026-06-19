@@ -12,3 +12,10 @@ data:
 
   SPRING_CLOUD_CONSUL_CONFIG_ENABLED: "false"
   SPRING_CLOUD_CONSUL_CONFIG_IMPORT_CHECK_ENABLED: "false"
+
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "{{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }}"
+  KAFKA_BOOTSTRAP_SERVERS: "{{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }}"
+
+  KAFKA_TOPIC_CASH_EVENTS: {{ .Values.global.kafka.topics.cashEvents | quote }}
+  KAFKA_TOPIC_TRANSFER_EVENTS: {{ .Values.global.kafka.topics.transferEvents | quote }}
+  KAFKA_TOPIC_ACCOUNTS_EVENTS: {{ .Values.global.kafka.topics.accountsEvents | quote }}

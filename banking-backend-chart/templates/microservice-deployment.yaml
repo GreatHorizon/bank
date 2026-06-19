@@ -40,6 +40,15 @@ spec:
                   key: CLIENT_SECRET
             {{- end }}
 
+            {{- if $svc.kafka }}
+            - name: KAFKA_TOPIC
+              value: {{ $svc.kafka.topic | quote }}
+            - name: APP_KAFKA_TOPIC
+              value: {{ $svc.kafka.topic | quote }}
+            - name: APP_KAFKA_PRODUCER_ENABLED
+              value: "true"
+            {{- end }}
+
             {{- if and $svc.db $svc.db.enabled }}
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://{{ $svc.db.name }}:{{ $svc.db.port }}/{{ $svc.db.database }}"
@@ -56,6 +65,7 @@ spec:
                   name: {{ $svc.db.name }}-secret
                   key: password
             {{- end }}
+
 
           readinessProbe:
             httpGet:

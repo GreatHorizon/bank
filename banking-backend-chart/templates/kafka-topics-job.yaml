@@ -1,0 +1,53 @@
+{{- if and .Values.global.kafka.enabled .Values.global.kafka.topicDefinitions }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-kafka-topics
+  labels:
+    app: {{ .Release.Name }}-kafka-topics
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-kafka-topics
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-topics
+          image: {{ .Values.global.kafka.image }}
+          imagePullPolicy: {{ .Values.global.kafka.imagePullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              echo "Waiting for Kafka..."
+              until /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server {{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }} \
+                --list >/dev/null 2>&1; do
+                echo "Kafka is not ready yet..."
+                sleep 5
+              done
+
+              echo "Creating Kafka topics..."
+
+              {{- range .Values.global.kafka.topicDefinitions }}
+              /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server {{ $.Values.global.kafka.name }}:{{ $.Values.global.kafka.port }} \
+                --create \
+                --if-not-exists \
+                --topic {{ .name }} \
+                --partitions {{ .partitions }} \
+                --replication-factor {{ .replicationFactor }}
+              {{- end }}
+
+              echo "Kafka topics:"
+              /opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server {{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }} \
+                --list
+{{- end }}
