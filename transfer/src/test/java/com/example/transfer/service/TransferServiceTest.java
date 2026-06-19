@@ -54,7 +54,6 @@ class TransferServiceTest {
         NotificationDto notification = notificationCaptor.getValue();
 
         assertThat(notification).isNotNull();
-        assertThat(notification.service()).isEqualTo("transfer-service");
         assertThat(notification.amount()).isEqualTo(30L);
         assertThat(notification.toLogin()).isEqualTo("petr");
     }

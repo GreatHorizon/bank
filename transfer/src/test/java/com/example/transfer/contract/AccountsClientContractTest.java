@@ -1,5 +1,6 @@
 package com.example.transfer.contract;
 
+import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.TransferMoneyDto;
 import com.example.transfer.client.AccountsClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,8 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.cloud.consul.config.import-check.enabled=false",
         "spring.cloud.discovery.enabled=false",
         "accounts.base-url=http://localhost:8081",
-        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
-
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer",
+        "app.kafka.producer.enabled=false"
 })
 @AutoConfigureStubRunner(
         ids = "com.example:accounts:0.0.1-SNAPSHOT:stubs:8081",
@@ -38,6 +40,9 @@ class AccountsClientContractTest {
 
     @Autowired
     private AccountsClient accountsClient;
+
+    @MockitoBean
+    private NotificationsClient notificationsClient;
 
     @BeforeEach
     void mockOAuthToken() {

@@ -68,7 +68,6 @@ class AccountsControllerIntegrationTest {
     private ClientRegistrationRepository clientRegistrationRepository;
 
     @DynamicPropertySource
-
     static void configureProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
@@ -197,39 +196,26 @@ class AccountsControllerIntegrationTest {
     }
 
     @Test
-
     void transferWithAccountsRoleMovesMoneyBetweenAccounts() throws Exception {
 
         String body = """
-
-            {
-
-              "login": "alice",
-
-              "amount": 40
-
-            }
-
-            """;
+                {
+                  "login": "alice",
+                  "amount": 40
+                }
+                """;
 
         mockMvc.perform(post("/accounts/transfer")
-
                         .param("login", "john")
-
                         .with(jwt().authorities(() -> "accounts_role"))
-
                         .contentType(MediaType.APPLICATION_JSON)
-
                         .content(body))
-
                 .andExpect(status().isOk());
 
         org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
-
                 .isEqualTo(60L);
 
         org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("alice").orElseThrow().getBalance())
-
                 .isEqualTo(90L);
 
     }
