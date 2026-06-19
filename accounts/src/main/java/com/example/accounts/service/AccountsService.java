@@ -55,7 +55,6 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "createAccount",
-                        "accounts-service",
                         null,
                         login,
                         null
@@ -84,7 +83,6 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getAccountsForTransfer",
-                        "accounts-service",
                         null, login,
                         null
                 )
@@ -99,7 +97,8 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "balance",
-                        "accounts-service", null, login,
+                        null,
+                        login,
                         null
                 )
         );
@@ -125,7 +124,8 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "putCash",
-                        "accounts-service", null, login,
+                        null,
+                        login,
                         null
                 )
         );
@@ -147,7 +147,6 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getCash",
-                        "accounts-service",
                         null,
                         login,
                         null
@@ -184,7 +183,6 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getCash",
-                        "accounts-service",
                         transferMoneyDto.amount(),
                         fromLogin,
                         transferMoneyDto.login()

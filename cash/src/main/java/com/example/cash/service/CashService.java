@@ -27,7 +27,6 @@ public class CashService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "putCash",
-                        "cash-service",
                         amount,
                         login,
                         null
@@ -49,7 +48,6 @@ public class CashService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getCash",
-                        "cash-service",
                         amount,
                         login,
                         null
