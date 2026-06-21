@@ -140,6 +140,10 @@ public class AccountsService {
         AccountModel account = accountsRepository.findByLogin(login)
                 .orElseThrow(() -> new AccountNotFoundException(login));
 
+        if (amount > account.getBalance()) {
+            throw new IllegalArgumentException("Недостаточно средств");
+        }
+
         account.setBalance(account.getBalance() - amount);
 
         accountsRepository.save(account);
@@ -156,8 +160,8 @@ public class AccountsService {
 
     @Transactional
     public void transfer(String fromLogin, TransferMoneyDto transferMoneyDto) {
-        if (accountsRepository.findBalanceByLogin(fromLogin) < transferMoneyDto.amount()) {
-            throw new IllegalArgumentException("Недостаточно средств");
+        if (transferMoneyDto.amount() <= 0) {
+            throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
         final var accountFromOptional = accountsRepository.findByLogin(fromLogin);
@@ -169,6 +173,10 @@ public class AccountsService {
 
         if (accountToOptional.isEmpty()) {
             throw new AccountNotFoundException(transferMoneyDto.login());
+        }
+
+        if (accountsRepository.findBalanceByLogin(fromLogin) < transferMoneyDto.amount()) {
+            throw new IllegalArgumentException("Недостаточно средств");
         }
 
         final var accountFrom = accountFromOptional.get();
