@@ -1,6 +1,6 @@
 package com.example.accounts.controller;
 
-import com.example.accounts.model.AccountModel;
+import com.example.accounts.model.Account;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,8 +84,8 @@ class AccountsControllerIntegrationTest {
         registry.add("spring.cloud.discovery.enabled", () -> "false");
     }
 
-    private static AccountModel account(String login, String firstName, String lastName, Long balance) {
-        AccountModel account = new AccountModel();
+    private static Account account(String login, String firstName, String lastName, Long balance) {
+        Account account = new Account();
         account.setLogin(login);
         account.setFirstName(firstName);
         account.setLastName(lastName);
@@ -139,13 +139,13 @@ class AccountsControllerIntegrationTest {
 
                 .andExpect(status().isOk());
 
-        AccountModel saved = accountsRepository.findByLogin("bob").orElseThrow();
+        Account saved = accountsRepository.findByLogin("bob").orElseThrow();
 
         org.assertj.core.api.Assertions.assertThat(saved.getFirstName()).isEqualTo("Bob");
 
         org.assertj.core.api.Assertions.assertThat(saved.getLastName()).isEqualTo("Brown");
 
-        org.assertj.core.api.Assertions.assertThat(saved.getbirthDate())
+        org.assertj.core.api.Assertions.assertThat(saved.getBirthDate())
 
                 .isEqualTo(java.time.LocalDate.of(2000, 1, 1));
 

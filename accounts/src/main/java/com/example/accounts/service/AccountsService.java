@@ -1,7 +1,7 @@
 package com.example.accounts.service;
 
 import com.example.accounts.error.AccountNotFoundException;
-import com.example.accounts.model.AccountModel;
+import com.example.accounts.model.Account;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.*;
@@ -36,8 +36,8 @@ public class AccountsService {
 
         NameParts nameParts = parseName(createAccountDto.name());
 
-        AccountModel accountModel = accountsRepository.findByLogin(login)
-                .orElseGet(() -> new AccountModel(
+        Account account = accountsRepository.findByLogin(login)
+                .orElseGet(() -> new Account(
                                 login,
                                 nameParts.firstName(),
                                 nameParts.lastName(),
@@ -45,12 +45,12 @@ public class AccountsService {
                         )
                 );
 
-        accountModel.setFirstName(nameParts.firstName());
-        accountModel.setLastName(nameParts.lastName());
-        accountModel.setBirthDate(createAccountDto.birthDate());
-        accountModel.setBalance(0L);
+        account.setFirstName(nameParts.firstName());
+        account.setLastName(nameParts.lastName());
+        account.setBirthDate(createAccountDto.birthDate());
+        account.setBalance(0L);
 
-        accountsRepository.save(accountModel);
+        accountsRepository.save(account);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -64,7 +64,7 @@ public class AccountsService {
 
     public AccountDto getAccountByLogin(String login) {
         return accountsRepository.findByLogin(login)
-                .map((model) -> new AccountDto(model.getFirstName(), model.getLastName(), model.getbirthDate(), model.getBalance()))
+                .map((model) -> new AccountDto(model.getFirstName(), model.getLastName(), model.getBirthDate(), model.getBalance()))
                 .orElseThrow(() -> new AccountNotFoundException(login));
     }
 
@@ -112,7 +112,7 @@ public class AccountsService {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        AccountModel account = accountsRepository.findByLogin(login)
+        Account account = accountsRepository.findByLogin(login)
                 .orElseThrow(() -> new AccountNotFoundException(login));
 
         final var newBalance = account.getBalance() + amount;
@@ -137,7 +137,7 @@ public class AccountsService {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        AccountModel account = accountsRepository.findByLogin(login)
+        Account account = accountsRepository.findByLogin(login)
                 .orElseThrow(() -> new AccountNotFoundException(login));
 
         if (amount > account.getBalance()) {
