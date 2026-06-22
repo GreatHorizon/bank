@@ -1,3 +1,10 @@
+app:
+  kafka:
+    topics:
+      accounts-events: ${APP_KAFKA_TOPICS_ACCOUNTS_EVENTS:accounts-events}
+      cash-events: ${APP_KAFKA_TOPICS_CASH_EVENTS:cash-events}
+      transfer-events: ${APP_KAFKA_TOPICS_TRANSFER_EVENTS:transfer-events}
+
 spring:
   application:
     name: notifications

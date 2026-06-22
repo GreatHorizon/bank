@@ -14,7 +14,6 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/api/notifications/**").authenticated()
                         .anyRequest().denyAll()
                 ).build();
     }

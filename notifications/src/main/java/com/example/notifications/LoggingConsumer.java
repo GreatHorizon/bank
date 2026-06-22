@@ -16,8 +16,12 @@ public class LoggingConsumer {
     }
 
     @KafkaListener(
-            topics = {"accounts-events", "cash-events", "transfer-events"},
-            groupId = "notifications-service"
+            topics = {
+                    "${app.kafka.topics.accounts-events}",
+                    "${app.kafka.topics.cash-events}",
+                    "${app.kafka.topics.transfer-events}"
+            },
+            groupId = "${spring.kafka.consumer.group-id:notifications-service}"
     )
     public void listen(ConsumerRecord<String, NotificationDto> record) {
         NotificationDto notification = record.value();
