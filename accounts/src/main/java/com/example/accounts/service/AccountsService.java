@@ -108,7 +108,7 @@ public class AccountsService {
 
     @Transactional
     public void putCash(String login, Long amount) {
-        if (amount <= 0) {
+        if (amount == null || amount <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
@@ -133,7 +133,7 @@ public class AccountsService {
 
     @Transactional
     public void getCash(String login, Long amount) {
-        if (amount <= 0) {
+        if (amount == null || amount <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
@@ -160,7 +160,7 @@ public class AccountsService {
 
     @Transactional
     public void transfer(String fromLogin, TransferMoneyDto transferMoneyDto) {
-        if (transferMoneyDto.amount() <= 0) {
+        if (transferMoneyDto.amount() == null || transferMoneyDto.amount() <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
