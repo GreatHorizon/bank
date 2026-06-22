@@ -191,7 +191,7 @@ public class AccountsService {
 
         notificationsClient.sendNotification(
                 new NotificationDto(
-                        "getCash",
+                        "transfer",
                         transferMoneyDto.amount(),
                         fromLogin,
                         transferMoneyDto.login()
@@ -214,5 +214,4 @@ public class AccountsService {
 
     private record NameParts(String firstName, String lastName) {
     }
-
 }
