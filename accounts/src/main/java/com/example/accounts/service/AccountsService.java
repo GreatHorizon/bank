@@ -165,11 +165,12 @@ public class AccountsService {
         }
 
         final var accountFromOptional = accountsRepository.findByLogin(fromLogin);
-        final var accountToOptional = accountsRepository.findByLogin(transferMoneyDto.login());
 
         if (accountFromOptional.isEmpty()) {
             throw new AccountNotFoundException(fromLogin);
         }
+
+        final var accountToOptional = accountsRepository.findByLogin(transferMoneyDto.login());
 
         if (accountToOptional.isEmpty()) {
             throw new AccountNotFoundException(transferMoneyDto.login());
