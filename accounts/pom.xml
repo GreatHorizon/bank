@@ -173,7 +173,7 @@
                     <url>jdbc:postgresql://localhost:5433/shop</url>
                     <username>postgres</username>
                     <password>postgres</password>
-                    <changeLogFile>src/main/resources/db/changelog/db.changelog-master.yaml</changeLogFile>
+                    <changeLogFile>src/main/resources/db.changelog/db.changelog-master.yaml</changeLogFile>
                 </configuration>
             </plugin>
         </plugins>
