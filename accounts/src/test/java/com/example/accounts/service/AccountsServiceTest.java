@@ -261,6 +261,29 @@ class AccountsServiceTest {
     }
 
     @Test
+    void getCashThrowsIfNoEnoughBalance() {
+        Account account = new Account(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+
+        account.setBalance(100L);
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.getCash("john", 50000L)
+        );
+
+        assertEquals("Недостаточно средств", exception.getMessage());
+
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
     void transferMovesMoneyBetweenAccounts() {
         Account from = new Account(
                 "john",
@@ -298,7 +321,23 @@ class AccountsServiceTest {
     void transferThrowsIfNotEnoughMoney() {
         TransferMoneyDto dto = new TransferMoneyDto("anna", 300L);
 
+        Account from = new Account(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+
+        Account to = new Account(
+                "anna",
+                "Anna",
+                "Ivanova",
+                LocalDate.of(1995, 1, 1)
+        );
+
         when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
+        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -312,12 +351,25 @@ class AccountsServiceTest {
     }
 
     @Test
+    void transferThrowsIfNegativeSum() {
+        TransferMoneyDto dto = new TransferMoneyDto("anna", -300L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.transfer("john", dto)
+        );
+
+        assertEquals("Сумма должна быть больше нуля", exception.getMessage());
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
     void transferThrowsIfSourceAccountNotFound() {
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
-        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(new Account()));
 
         assertThrows(
                 AccountNotFoundException.class,
@@ -336,11 +388,11 @@ class AccountsServiceTest {
                 "Smith",
                 LocalDate.of(1990, 1, 1)
         );
+
         from.setBalance(100L);
 
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
         when(accountsRepository.findByLogin("anna")).thenReturn(Optional.empty());
 

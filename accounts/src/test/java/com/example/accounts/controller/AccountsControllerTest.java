@@ -23,8 +23,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -121,7 +123,6 @@ class AccountsControllerIntegrationTest {
 
     @Test
     void createAccountCreatesNewAccountForCurrentUser() throws Exception {
-
         String body = """
                 {
                   "name": "Bob Brown",
@@ -130,26 +131,18 @@ class AccountsControllerIntegrationTest {
                 """;
 
         mockMvc.perform(post("/accounts")
-
                         .with(jwt().jwt(jwt -> jwt.claim("preferred_username", "bob")))
-
                         .contentType(MediaType.APPLICATION_JSON)
-
                         .content(body))
-
                 .andExpect(status().isOk());
 
         Account saved = accountsRepository.findByLogin("bob").orElseThrow();
 
-        org.assertj.core.api.Assertions.assertThat(saved.getFirstName()).isEqualTo("Bob");
-
-        org.assertj.core.api.Assertions.assertThat(saved.getLastName()).isEqualTo("Brown");
-
-        org.assertj.core.api.Assertions.assertThat(saved.getBirthDate())
-
+        assertThat(saved.getFirstName()).isEqualTo("Bob");
+        assertThat(saved.getLastName()).isEqualTo("Brown");
+        assertThat(saved.getBirthDate())
                 .isEqualTo(java.time.LocalDate.of(2000, 1, 1));
-
-        org.assertj.core.api.Assertions.assertThat(saved.getBalance()).isEqualTo(0L);
+        assertThat(saved.getBalance()).isEqualTo(0L);
 
     }
 
@@ -179,7 +172,7 @@ class AccountsControllerIntegrationTest {
                         .with(jwt().authorities(() -> "accounts_role")))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
+        assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
                 .isEqualTo(125L);
     }
 
@@ -191,7 +184,7 @@ class AccountsControllerIntegrationTest {
                         .with(jwt().authorities(() -> "accounts_role")))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
+        assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
                 .isEqualTo(70L);
     }
 
@@ -212,10 +205,10 @@ class AccountsControllerIntegrationTest {
                         .content(body))
                 .andExpect(status().isOk());
 
-        org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
+        assertThat(accountsRepository.findByLogin("john").orElseThrow().getBalance())
                 .isEqualTo(60L);
 
-        org.assertj.core.api.Assertions.assertThat(accountsRepository.findByLogin("alice").orElseThrow().getBalance())
+        assertThat(accountsRepository.findByLogin("alice").orElseThrow().getBalance())
                 .isEqualTo(90L);
 
     }
@@ -226,5 +219,62 @@ class AccountsControllerIntegrationTest {
                         .param("login", "john")
                         .with(jwt()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void putCashWithZeroAmountDoesNotChangeBalance() throws Exception {
+        mockMvc.perform(put("/accounts/balance")
+                        .param("login", "john")
+                        .param("amount", "0")
+                        .with(jwt().authorities(() -> "accounts_role")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Сумма должна быть больше нуля"));
+
+        assertThat(
+                accountsRepository.findByLogin("john").orElseThrow().getBalance()
+        ).isEqualTo(100L);
+
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void getCashWithInsufficientBalanceDoesNotChangeBalance() throws Exception {
+        mockMvc.perform(post("/accounts/balance")
+                        .param("login", "john")
+                        .param("amount", "1000")
+                        .with(jwt().authorities(() -> "accounts_role")))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("Недостаточно средств"));
+
+        assertThat(
+                accountsRepository.findByLogin("john").orElseThrow().getBalance()
+        ).isEqualTo(100L);
+
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void createAccountForUnderageUserDoesNotCreateAccount() throws Exception {
+        String body = """
+                {
+                  "name": "Young User",
+                  "birthDate": "2015-01-01"
+                }
+                """;
+
+        mockMvc.perform(post("/accounts")
+                        .with(jwt().jwt(jwt -> jwt.claim("preferred_username", "young")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("User must be at least 18 years old"));
+
+        assertThat(accountsRepository.findByLogin("young"))
+                .isEmpty();
+
+        verifyNoInteractions(notificationsClient);
     }
 }
