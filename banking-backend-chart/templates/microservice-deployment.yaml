@@ -65,6 +65,14 @@ spec:
                   name: {{ $svc.db.name }}-secret
                   key: password
             {{- end }}
+            {{- if eq $key "notifications" }}
+            - name: APP_KAFKA_TOPICS_ACCOUNTS_EVENTS
+              value: {{ $.Values.global.kafka.topics.accountsEvents | quote }}
+            - name: APP_KAFKA_TOPICS_CASH_EVENTS
+              value: {{ $.Values.global.kafka.topics.cashEvents | quote }}
+            - name: APP_KAFKA_TOPICS_TRANSFER_EVENTS
+              value: {{ $.Values.global.kafka.topics.transferEvents | quote }}
+            {{- end }}
 
 
           readinessProbe:

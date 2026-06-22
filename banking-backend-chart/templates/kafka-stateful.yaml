@@ -16,26 +16,60 @@ spec:
       labels:
         app: {{ .Values.global.kafka.name }}
     spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
       containers:
         - name: kafka
           image: {{ .Values.global.kafka.image }}
           imagePullPolicy: {{ .Values.global.kafka.imagePullPolicy | default "IfNotPresent" }}
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+
           ports:
             - name: kafka
               containerPort: {{ .Values.global.kafka.port }}
             - name: controller
               containerPort: {{ .Values.global.kafka.controllerPort }}
+
+          resources:
+            {{- toYaml (.Values.global.kafka.resources | default dict) | nindent 12 }}
+
+          readinessProbe:
+            tcpSocket:
+              port: kafka
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+
+          livenessProbe:
+            tcpSocket:
+              port: kafka
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
           env:
             - name: KAFKA_NODE_ID
               value: "1"
             - name: KAFKA_PROCESS_ROLES
               value: "broker,controller"
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: "1@kafka-0.kafka:9093"
+              value: "1@{{ .Values.global.kafka.name }}-0.{{ .Values.global.kafka.name }}:{{ .Values.global.kafka.controllerPort }}"
             - name: KAFKA_LISTENERS
-              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+              value: "PLAINTEXT://:{{ .Values.global.kafka.port }},CONTROLLER://:{{ .Values.global.kafka.controllerPort }}"
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: "PLAINTEXT://kafka:9092"
+              value: "PLAINTEXT://{{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }}"
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
@@ -54,9 +88,11 @@ spec:
               value: "0"
             - name: CLUSTER_ID
               value: "MkU3OEVBNTcwNTJENDM2Qk"
+
           volumeMounts:
             - name: kafka-data
               mountPath: /tmp/kraft-combined-logs
+
   volumeClaimTemplates:
     - metadata:
         name: kafka-data

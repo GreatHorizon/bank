@@ -15,6 +15,13 @@ global:
     port: 9092
     controllerPort: 9093
     storage: 2Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
     topics:
       cashEvents: cash-events
       transferEvents: transfer-events
@@ -44,7 +51,7 @@ gateway:
 services:
   accounts:
     name: accounts-service
-    image: accounts-service:1.0.1
+    image: accounts-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
@@ -62,11 +69,17 @@ services:
       username: ""
       password: ""
       storage: 2Gi
-
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
 
   cash:
     name: cash-service
-    image: cash-service:1.0.1
+    image: cash-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
@@ -78,7 +91,7 @@ services:
 
   transfer:
     name: transfer-service
-    image: transfer-service:1.0.1
+    image: transfer-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
@@ -90,7 +103,7 @@ services:
 
   notifications:
     name: notifications-service
-    image: notifications-service:1.0.2
+    image: notifications-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
