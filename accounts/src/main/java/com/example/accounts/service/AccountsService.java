@@ -137,16 +137,15 @@ public class AccountsService {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        Account account = accountsRepository.findByLogin(login)
-                .orElseThrow(() -> new AccountNotFoundException(login));
-
-        if (amount > account.getBalance()) {
-            throw new IllegalArgumentException("Недостаточно средств");
+        if (accountsRepository.findByLogin(login).isEmpty()) {
+            throw new AccountNotFoundException(login);
         }
 
-        account.setBalance(account.getBalance() - amount);
+        final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(login, amount);
 
-        accountsRepository.save(account);
+        if (withdrawnRows == 0) {
+            throw new IllegalArgumentException("Недостаточно средств");
+        }
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -160,34 +159,32 @@ public class AccountsService {
 
     @Transactional
     public void transfer(String fromLogin, TransferMoneyDto transferMoneyDto) {
-        if (transferMoneyDto.amount() == null || transferMoneyDto.amount() <= 0) {
+        final var transferAmount = transferMoneyDto.amount();
+        final var toLogin = transferMoneyDto.login();
+
+        if (transferAmount == null || transferAmount <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        final var accountFromOptional = accountsRepository.findByLogin(fromLogin);
-
-        if (accountFromOptional.isEmpty()) {
+        if (accountsRepository.findByLogin(fromLogin).isEmpty()) {
             throw new AccountNotFoundException(fromLogin);
         }
 
-        final var accountToOptional = accountsRepository.findByLogin(transferMoneyDto.login());
-
-        if (accountToOptional.isEmpty()) {
-            throw new AccountNotFoundException(transferMoneyDto.login());
+        if (accountsRepository.findByLogin(toLogin).isEmpty()) {
+            throw new AccountNotFoundException(toLogin);
         }
 
-        if (accountsRepository.findBalanceByLogin(fromLogin) < transferMoneyDto.amount()) {
+        final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(fromLogin, transferAmount);
+
+        if (withdrawnRows == 0) {
             throw new IllegalArgumentException("Недостаточно средств");
         }
 
-        final var accountFrom = accountFromOptional.get();
-        final var accountTo = accountToOptional.get();
+        final var depositedRows = accountsRepository.deposit(toLogin, transferAmount);
 
-        accountFrom.setBalance(accountFrom.getBalance() - transferMoneyDto.amount());
-        accountTo.setBalance(accountTo.getBalance() + transferMoneyDto.amount());
-
-        accountsRepository.save(accountFrom);
-        accountsRepository.save(accountTo);
+        if (depositedRows == 0) {
+            throw new AccountNotFoundException(toLogin);
+        }
 
         notificationsClient.sendNotification(
                 new NotificationDto(

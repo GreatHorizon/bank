@@ -238,12 +238,11 @@ class AccountsServiceTest {
         account.setBalance(100L);
 
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 40L)).thenReturn(1);
 
         accountsService.getCash("john", 40L);
 
-        assertEquals(60L, account.getBalance());
-
-        verify(accountsRepository).save(account);
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 40L);
         verify(notificationsClient).sendNotification(any());
     }
 
@@ -272,6 +271,7 @@ class AccountsServiceTest {
         account.setBalance(100L);
 
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 50000L)).thenReturn(0);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -280,6 +280,7 @@ class AccountsServiceTest {
 
         assertEquals("Недостаточно средств", exception.getMessage());
 
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 50000L);
         verifyNoInteractions(notificationsClient);
     }
 
@@ -291,6 +292,7 @@ class AccountsServiceTest {
                 "Smith",
                 LocalDate.of(1990, 1, 1)
         );
+
         from.setBalance(100L);
 
         Account to = new Account(
@@ -299,21 +301,23 @@ class AccountsServiceTest {
                 "Ivanova",
                 LocalDate.of(1995, 1, 1)
         );
+
         to.setBalance(20L);
 
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
         when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 30L)).thenReturn(1);
+        when(accountsRepository.deposit("anna", 30L)).thenReturn(1);
 
         accountsService.transfer("john", dto);
 
-        assertEquals(70L, from.getBalance());
-        assertEquals(50L, to.getBalance());
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 30L);
 
-        verify(accountsRepository).save(from);
-        verify(accountsRepository).save(to);
+        verify(accountsRepository).deposit("anna", 30L);
+
+        verify(accountsRepository, never()).save(any());
         verify(notificationsClient).sendNotification(any());
     }
 
@@ -335,9 +339,9 @@ class AccountsServiceTest {
                 LocalDate.of(1995, 1, 1)
         );
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
         when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 300L)).thenReturn(0);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
