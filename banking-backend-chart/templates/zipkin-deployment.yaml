@@ -1,0 +1,52 @@
+{{- if and .Values.global.zipkin .Values.global.zipkin.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.zipkin.name }}
+  labels:
+    app: {{ .Values.global.zipkin.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.zipkin.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.zipkin.name }}
+    spec:
+      containers:
+        - name: zipkin
+          image: {{ .Values.global.zipkin.image }}
+          imagePullPolicy: {{ .Values.global.zipkin.imagePullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.zipkin.port }}
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+{{- end }}

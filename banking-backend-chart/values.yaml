@@ -37,9 +37,19 @@ global:
         partitions: 1
         replicationFactor: 1
 
+  zipkin:
+    enabled: true
+    name: zipkin
+    image: openzipkin/zipkin:3.5
+    port: 9411
+    imagePullPolicy: IfNotPresent
+    service:
+      type: NodePort
+      nodePort: 30411
+
 gateway:
   name: gateway
-  image: gateway:1.0.1
+  image: gateway:1.0.4
   port: 8080
   replicas: 1
 
@@ -51,7 +61,7 @@ gateway:
 services:
   accounts:
     name: accounts-service
-    image: accounts-service:1.0.3
+    image: accounts-service:1.0.4
     port: 8080
     replicas: 1
     keycloak:
@@ -79,7 +89,7 @@ services:
 
   cash:
     name: cash-service
-    image: cash-service:1.0.3
+    image: cash-service:1.0.4
     port: 8080
     replicas: 1
     keycloak:
@@ -91,7 +101,7 @@ services:
 
   transfer:
     name: transfer-service
-    image: transfer-service:1.0.3
+    image: transfer-service:1.0.4
     port: 8080
     replicas: 1
     keycloak:
@@ -103,7 +113,7 @@ services:
 
   notifications:
     name: notifications-service
-    image: notifications-service:1.0.3
+    image: notifications-service:1.0.4
     port: 8080
     replicas: 1
     keycloak:

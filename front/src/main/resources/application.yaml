@@ -1,6 +1,16 @@
 server:
   port: 8084
 
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      zipkin:
+        enabled: true
+        endpoint: http://localhost:30411/api/v2/spans
+
 spring:
   application:
     name: front

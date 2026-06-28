@@ -2,6 +2,15 @@ app:
   kafka:
     topic: ${KAFKA_TOPIC_CASH_EVENTS:cash-events}
 
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      zipkin:
+        enabled: true
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:http://127.0.0.1:9411/api/v2/spans}
+
 spring:
   application:
     name: cash

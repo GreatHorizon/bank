@@ -2,6 +2,7 @@ package com.example.shared.config;
 
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.NotificationDto;
+import io.micrometer.observation.ObservationRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,16 +40,23 @@ public class NotificationClientConfig {
 
     @Bean
     public KafkaTemplate<String, NotificationDto> kafkaTemplate(
-            ProducerFactory<String, NotificationDto> producerFactory
+            ProducerFactory<String, NotificationDto> producerFactory,
+            ObservationRegistry observationRegistry
     ) {
-        return new KafkaTemplate<>(producerFactory);
+        KafkaTemplate<String, NotificationDto> kafkaTemplate = new KafkaTemplate<>(producerFactory);
+
+        kafkaTemplate.setObservationEnabled(true);
+
+        kafkaTemplate.setObservationRegistry(observationRegistry);
+
+        return kafkaTemplate;
     }
 
     @Bean
     public NotificationsClient notificationsClient(
-            KafkaTemplate<String, NotificationDto> notificationsRestClient,
+            KafkaTemplate<String, NotificationDto> kafkaTemplate,
             @Value("${app.kafka.topic}") String topic
     ) {
-        return new NotificationsClient(notificationsRestClient, topic);
+        return new NotificationsClient(kafkaTemplate, topic);
     }
 }

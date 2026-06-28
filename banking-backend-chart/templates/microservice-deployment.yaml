@@ -73,6 +73,8 @@ spec:
             - name: APP_KAFKA_TOPICS_TRANSFER_EVENTS
               value: {{ $.Values.global.kafka.topics.transferEvents | quote }}
             {{- end }}
+            - name: MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT
+              value: "http://{{ $.Values.global.zipkin.name }}:{{ $.Values.global.zipkin.port }}/api/v2/spans"
 
 
           readinessProbe:

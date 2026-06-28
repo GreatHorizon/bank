@@ -19,9 +19,12 @@ public class AccountsClient {
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final RestClient restClient;
 
-    public AccountsClient(OAuth2AuthorizedClientService authorizedClientService) {
+    public AccountsClient(
+            OAuth2AuthorizedClientService authorizedClientService,
+            RestClient.Builder restClientBuilder
+    ) {
         this.authorizedClientService = authorizedClientService;
-        this.restClient = RestClient.builder()
+        this.restClient = restClientBuilder
                 .baseUrl("http://localhost:30080")
                 .build();
     }

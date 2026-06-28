@@ -12,9 +12,12 @@ public class CashClient {
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final RestClient restClient;
 
-    public CashClient(OAuth2AuthorizedClientService authorizedClientService) {
+    public CashClient(
+            OAuth2AuthorizedClientService authorizedClientService,
+            RestClient.Builder restClientBuilder
+    ) {
         this.authorizedClientService = authorizedClientService;
-        this.restClient = RestClient.builder()
+        this.restClient = restClientBuilder
                 .baseUrl("http://localhost:30080")
                 .build();
     }
@@ -37,21 +40,13 @@ public class CashClient {
         String accessToken = getAccessToken(authentication);
 
         restClient.put()
-
                 .uri(uriBuilder -> uriBuilder
-
                         .path("/api/cash")
-
                         .queryParam("amount", amount)
-
                         .build())
-
                 .headers(headers -> headers.setBearerAuth(accessToken))
-
                 .retrieve()
-
                 .toBodilessEntity();
-
     }
 
     private String getAccessToken(Authentication authentication) {
