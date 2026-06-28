@@ -16,16 +16,11 @@
     <packaging>jar</packaging>
 
     <dependencies>
+
         <!-- For @Configuration, @Bean -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-        </dependency>
-
-        <!-- For RestClient -->
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
         </dependency>
 
         <!-- For OAuth2AuthorizedClientManager, OAuth2ClientHttpRequestInterceptor, etc. -->
@@ -42,6 +37,10 @@
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
     </dependencies>
 

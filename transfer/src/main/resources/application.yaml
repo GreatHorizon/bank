@@ -1,3 +1,7 @@
+app:
+  kafka:
+    topic: ${KAFKA_TOPIC_TRANSFER_EVENTS:transfer-events}
+
 spring:
   application:
     name: transfer

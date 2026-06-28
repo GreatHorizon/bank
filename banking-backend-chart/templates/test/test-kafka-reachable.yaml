@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-test-kafka-reachable"
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}-test-kafka-reachable"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: kafka-test
+      image: apache/kafka:3.7.1
+      command:
+        - sh
+        - -c
+        - |
+          set -e
+
+          echo "Testing Kafka reachable..."
+
+          /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server {{ .Values.global.kafka.name }}:{{ .Values.global.kafka.port }} \
+            --list
+
+          echo "Kafka reachable OK"

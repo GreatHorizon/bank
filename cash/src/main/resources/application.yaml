@@ -1,6 +1,16 @@
+app:
+  kafka:
+    topic: ${KAFKA_TOPIC_CASH_EVENTS:cash-events}
+
 spring:
   application:
     name: cash
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
 
   security:
     oauth2:
@@ -28,3 +38,4 @@ logging:
     org.springframework.web.client.RestClient: DEBUG
     org.springframework.web.client.RestTemplate: DEBUG
     org.springframework.security: DEBUG
+    org.apache.kafka.clients.producer: INFO

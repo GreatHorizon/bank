@@ -1,6 +1,5 @@
 package com.example.accounts.contract;
 
-import com.example.accounts.model.AccountModel;
 import com.example.accounts.service.AccountsService;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.AccountDto;

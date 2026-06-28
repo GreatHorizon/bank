@@ -1,12 +1,14 @@
 package com.example.accounts;
 
-import com.example.shared.config.NotificationsRestClientConfig;
+import com.example.shared.config.NotificationClientConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
 @SpringBootApplication
-@Import(NotificationsRestClientConfig.class)
+@Import({
+        NotificationClientConfig.class
+})
 public class AccountsApplication {
 
     public static void main(String[] args) {

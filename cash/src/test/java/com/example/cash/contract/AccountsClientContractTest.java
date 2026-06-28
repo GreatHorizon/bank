@@ -1,6 +1,7 @@
 package com.example.cash.contract;
 
 import com.example.cash.client.AccountsClient;
+import com.example.shared.client.NotificationsClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +15,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration," +
                 "org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration," +
                 "org.springframework.boot.liquibase.autoconfigure.LiquibaseAutoConfiguration",
-        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer"
-
+        "spring.security.oauth2.resourceserver.jwt.issuer-uri=http://localhost/test-issuer",
+        "app.kafka.producer.enabled=false"
 })
 @AutoConfigureStubRunner(
         ids = "com.example:accounts:+:stubs:8081",
@@ -42,6 +44,10 @@ class AccountsClientContractTest {
 
     @Autowired
     private AccountsClient accountsClient;
+
+
+    @MockitoBean
+    private NotificationsClient notificationsClient;
 
     @BeforeEach
     void mockOAuthToken() {

@@ -1,6 +1,6 @@
 package com.example.shared.dto;
 
-public record NotificationDto(String type, String service,  Long amount, String login, String toLogin){
+public record NotificationDto(String type, Long amount, String login, String toLogin){
 }
 
 

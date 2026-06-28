@@ -47,7 +47,6 @@ class CashServiceTest {
 
         NotificationDto notification = notificationCaptor.getValue();
 
-        assertThat(notification.service()).isEqualTo("cash-service");
         assertThat(notification.amount()).isEqualTo(50L);
         assertThat(notification.login()).isEqualTo("john");
     }
@@ -70,7 +69,6 @@ class CashServiceTest {
 
         NotificationDto notification = notificationCaptor.getValue();
 
-        assertThat(notification.service()).isEqualTo("cash-service");
         assertThat(notification.amount()).isEqualTo(40L);
         assertThat(notification.login()).isEqualTo("john");
     }

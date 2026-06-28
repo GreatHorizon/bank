@@ -1,14 +1,45 @@
 global:
   environment: k8s
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Never
+
 
   keycloak:
     issuerUri: ""
     jwkSetUri: ""
 
+  kafka:
+    imagePullPolicy: IfNotPresent
+    enabled: true
+    name: kafka
+    image: apache/kafka:3.7.1
+    port: 9092
+    controllerPort: 9093
+    storage: 2Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
+    topics:
+      cashEvents: cash-events
+      transferEvents: transfer-events
+      accountsEvents: accounts-events
+    topicDefinitions:
+      - name: cash-events
+        partitions: 1
+        replicationFactor: 1
+      - name: transfer-events
+        partitions: 1
+        replicationFactor: 1
+      - name: accounts-events
+        partitions: 1
+        replicationFactor: 1
+
 gateway:
   name: gateway
-  image: gateway:1.0.0
+  image: gateway:1.0.1
   port: 8080
   replicas: 1
 
@@ -20,11 +51,15 @@ gateway:
 services:
   accounts:
     name: accounts-service
-    image: accounts-service:1.0.0
+    image: accounts-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: accounts-events
+      producer:
+        enabled: true
     db:
       enabled: true
       name: accounts-db
@@ -34,27 +69,41 @@ services:
       username: ""
       password: ""
       storage: 2Gi
-
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
 
   cash:
     name: cash-service
-    image: cash-service:1.0.0
+    image: cash-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: cash-events
+      producer:
+        enabled: true
 
   transfer:
     name: transfer-service
-    image: transfer-service:1.0.0
+    image: transfer-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      topic: transfer-events
+      producer:
+        enabled: true
 
   notifications:
     name: notifications-service
-    image: notifications-service:1.0.0
+    image: notifications-service:1.0.3
     port: 8080
     replicas: 1
     keycloak:

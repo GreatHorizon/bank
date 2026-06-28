@@ -35,9 +35,9 @@ public class TransferService {
 
         notificationsClient.sendNotification(
                 new NotificationDto(
-                        "putCash",
-                        "transfer-service",
-                        transferMoneyDto.amount(), login,
+                        "transfer",
+                        transferMoneyDto.amount(),
+                        login,
                         transferMoneyDto.login()
                 )
         );

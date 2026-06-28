@@ -6,7 +6,7 @@ metadata:
     app: {{ .Values.gateway.name }}
     {{- include "banking-backend.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.gateway.service.type }}
+  type: {{ .Values.gateway.service.type | default "ClusterIP" }}
   selector:
     app: {{ .Values.gateway.name }}
   ports:
@@ -14,4 +14,6 @@ spec:
       protocol: TCP
       port: {{ .Values.gateway.service.port }}
       targetPort: {{ .Values.gateway.port }}
+      {{- if and .Values.gateway.service.nodePort (or (eq (.Values.gateway.service.type | default "ClusterIP") "NodePort") (eq (.Values.gateway.service.type | default "ClusterIP") "LoadBalancer")) }}
       nodePort: {{ .Values.gateway.service.nodePort }}
+      {{- end }}

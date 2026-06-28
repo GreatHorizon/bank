@@ -1,7 +1,7 @@
 package com.example.accounts.service;
 
 import com.example.accounts.error.AccountNotFoundException;
-import com.example.accounts.model.AccountModel;
+import com.example.accounts.model.Account;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.*;
@@ -36,8 +36,8 @@ public class AccountsService {
 
         NameParts nameParts = parseName(createAccountDto.name());
 
-        AccountModel accountModel = accountsRepository.findByLogin(login)
-                .orElseGet(() -> new AccountModel(
+        Account account = accountsRepository.findByLogin(login)
+                .orElseGet(() -> new Account(
                                 login,
                                 nameParts.firstName(),
                                 nameParts.lastName(),
@@ -45,17 +45,16 @@ public class AccountsService {
                         )
                 );
 
-        accountModel.setFirstName(nameParts.firstName());
-        accountModel.setLastName(nameParts.lastName());
-        accountModel.setBirthDate(createAccountDto.birthDate());
-        accountModel.setBalance(0L);
+        account.setFirstName(nameParts.firstName());
+        account.setLastName(nameParts.lastName());
+        account.setBirthDate(createAccountDto.birthDate());
+        account.setBalance(0L);
 
-        accountsRepository.save(accountModel);
+        accountsRepository.save(account);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "createAccount",
-                        "accounts-service",
                         null,
                         login,
                         null
@@ -65,7 +64,7 @@ public class AccountsService {
 
     public AccountDto getAccountByLogin(String login) {
         return accountsRepository.findByLogin(login)
-                .map((model) -> new AccountDto(model.getFirstName(), model.getLastName(), model.getbirthDate(), model.getBalance()))
+                .map((model) -> new AccountDto(model.getFirstName(), model.getLastName(), model.getBirthDate(), model.getBalance()))
                 .orElseThrow(() -> new AccountNotFoundException(login));
     }
 
@@ -84,7 +83,6 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getAccountsForTransfer",
-                        "accounts-service",
                         null, login,
                         null
                 )
@@ -99,7 +97,8 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "balance",
-                        "accounts-service", null, login,
+                        null,
+                        login,
                         null
                 )
         );
@@ -109,11 +108,11 @@ public class AccountsService {
 
     @Transactional
     public void putCash(String login, Long amount) {
-        if (amount <= 0) {
+        if (amount == null || amount <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        AccountModel account = accountsRepository.findByLogin(login)
+        Account account = accountsRepository.findByLogin(login)
                 .orElseThrow(() -> new AccountNotFoundException(login));
 
         final var newBalance = account.getBalance() + amount;
@@ -125,7 +124,8 @@ public class AccountsService {
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "putCash",
-                        "accounts-service", null, login,
+                        null,
+                        login,
                         null
                 )
         );
@@ -133,21 +133,23 @@ public class AccountsService {
 
     @Transactional
     public void getCash(String login, Long amount) {
-        if (amount <= 0) {
+        if (amount == null || amount <= 0) {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        AccountModel account = accountsRepository.findByLogin(login)
-                .orElseThrow(() -> new AccountNotFoundException(login));
+        if (accountsRepository.findByLogin(login).isEmpty()) {
+            throw new AccountNotFoundException(login);
+        }
 
-        account.setBalance(account.getBalance() - amount);
+        final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(login, amount);
 
-        accountsRepository.save(account);
+        if (withdrawnRows == 0) {
+            throw new IllegalArgumentException("Недостаточно средств");
+        }
 
         notificationsClient.sendNotification(
                 new NotificationDto(
                         "getCash",
-                        "accounts-service",
                         null,
                         login,
                         null
@@ -157,34 +159,36 @@ public class AccountsService {
 
     @Transactional
     public void transfer(String fromLogin, TransferMoneyDto transferMoneyDto) {
-        if (accountsRepository.findBalanceByLogin(fromLogin) < transferMoneyDto.amount()) {
-            throw new IllegalArgumentException("Недостаточно средств");
+        final var transferAmount = transferMoneyDto.amount();
+        final var toLogin = transferMoneyDto.login();
+
+        if (transferAmount == null || transferAmount <= 0) {
+            throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        final var accountFromOptional = accountsRepository.findByLogin(fromLogin);
-        final var accountToOptional = accountsRepository.findByLogin(transferMoneyDto.login());
-
-        if (accountFromOptional.isEmpty()) {
+        if (accountsRepository.findByLogin(fromLogin).isEmpty()) {
             throw new AccountNotFoundException(fromLogin);
         }
 
-        if (accountToOptional.isEmpty()) {
-            throw new AccountNotFoundException(transferMoneyDto.login());
+        if (accountsRepository.findByLogin(toLogin).isEmpty()) {
+            throw new AccountNotFoundException(toLogin);
         }
 
-        final var accountFrom = accountFromOptional.get();
-        final var accountTo = accountToOptional.get();
+        final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(fromLogin, transferAmount);
 
-        accountFrom.setBalance(accountFrom.getBalance() - transferMoneyDto.amount());
-        accountTo.setBalance(accountTo.getBalance() + transferMoneyDto.amount());
+        if (withdrawnRows == 0) {
+            throw new IllegalArgumentException("Недостаточно средств");
+        }
 
-        accountsRepository.save(accountFrom);
-        accountsRepository.save(accountTo);
+        final var depositedRows = accountsRepository.deposit(toLogin, transferAmount);
+
+        if (depositedRows == 0) {
+            throw new AccountNotFoundException(toLogin);
+        }
 
         notificationsClient.sendNotification(
                 new NotificationDto(
-                        "getCash",
-                        "accounts-service",
+                        "transfer",
                         transferMoneyDto.amount(),
                         fromLogin,
                         transferMoneyDto.login()
@@ -207,5 +211,4 @@ public class AccountsService {
 
     private record NameParts(String firstName, String lastName) {
     }
-
 }

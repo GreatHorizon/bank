@@ -24,7 +24,8 @@ pipeline {
         TRANSFER_IMAGE = "local/transfer-service:${BUILD_NUMBER}"
         NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
         GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
-
+        KAFKA_NAME = "kafka"
+        KAFKA_PORT = "9092"
         KUBECONFIG = "/var/jenkins_home/.kube/config"
         TESTCONTAINERS_HOST_OVERRIDE = "host.docker.internal"
     }
@@ -50,18 +51,17 @@ pipeline {
         }
 
         stage('Install Accounts Stubs') {
-          steps {
-              sh 'mvn -pl accounts -am clean install -DskipTests'
-              sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
-          }
+            steps {
+                sh 'mvn -pl accounts -am clean install -DskipTests'
+                sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
+            }
         }
 
         stage('Build and Test') {
-          steps {
-              sh 'mvn clean install'
-          }
+            steps {
+                sh 'mvn clean install'
+            }
         }
-
 
         stage('Build Docker Images') {
             parallel {
@@ -97,33 +97,97 @@ pipeline {
             }
         }
 
-       stage('Deploy to Kubernetes') {
-           when {
-               expression { return params.RUN_DEPLOY }
-           }
-           steps {
-               script {
-                   def secretCredentialId = params.ENVIRONMENT == 'prod'
-                       ? 'helm-values-prod'
-                       : 'helm-values-test'
-                   withCredentials([
-                       file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
-                   ]) {
-                       sh """
-                           helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
-                             -f ${CHART_PATH}/values.yaml \
-                             -f ${SECRET_VALUES_FILE} \
-                             --set global.imagePullPolicy=Never \
-                             --set gateway.image=${GATEWAY_IMAGE} \
-                             --set services.accounts.image=${ACCOUNTS_IMAGE} \
-                             --set services.cash.image=${CASH_IMAGE} \
-                             --set services.transfer.image=${TRANSFER_IMAGE} \
-                             --set services.notifications.image=${NOTIFICATIONS_IMAGE}
-                       """
-                   }
-               }
-           }
-       }
+        stage('Deploy to Kubernetes') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                script {
+                    def secretCredentialId = params.ENVIRONMENT == 'prod'
+                        ? 'helm-values-prod'
+                        : 'helm-values-test'
+
+                    withCredentials([
+                        file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
+                    ]) {
+                        sh """
+                            helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
+                              --wait \
+                              --timeout 300s \
+                              --set global.imagePullPolicy=Never \
+                              --set global.kafka.enabled=true \
+                              --set global.kafka.name=${KAFKA_NAME} \
+                              --set global.kafka.port=${KAFKA_PORT} \
+                              --set gateway.image=${GATEWAY_IMAGE} \
+                              --set services.accounts.image=${ACCOUNTS_IMAGE} \
+                              --set services.accounts.kafka.producer.enabled=true \
+                              --set services.accounts.kafka.topic=accounts-events \
+                              --set services.cash.image=${CASH_IMAGE} \
+                              --set services.cash.kafka.producer.enabled=true \
+                              --set services.cash.kafka.topic=cash-events \
+                              --set services.transfer.image=${TRANSFER_IMAGE} \
+                              --set services.transfer.kafka.producer.enabled=true \
+                              --set services.transfer.kafka.topic=transfer-events \
+                              --set services.notifications.image=${NOTIFICATIONS_IMAGE}
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Rollouts') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    kubectl rollout status statefulset/${KAFKA_NAME} --timeout=180s
+
+                    kubectl rollout status deployment/accounts-service --timeout=180s
+                    kubectl rollout status deployment/cash-service --timeout=180s
+                    kubectl rollout status deployment/transfer-service --timeout=180s
+                    kubectl rollout status deployment/notifications-service --timeout=180s
+                    kubectl rollout status deployment/gateway --timeout=180s
+                """
+            }
+        }
+
+        stage('Verify Kafka Topics') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    echo "Waiting for Kafka topics job..."
+
+                    kubectl wait \
+                      --for=condition=complete \
+                      job/${RELEASE_NAME}-kafka-topics \
+                      --timeout=180s || true
+
+                    echo "Kafka topics:"
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^accounts-events$'
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^cash-events$'
+
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^transfer-events$'
+
+                    echo "Kafka topics OK"
+                """
+            }
+        }
 
         stage('Helm Tests') {
             when {
@@ -142,6 +206,13 @@ pipeline {
 
         failure {
             echo "Umbrella pipeline failed"
+
+            sh """
+                kubectl get pods || true
+                kubectl get jobs || true
+                kubectl logs job/${RELEASE_NAME}-kafka-topics || true
+                kubectl logs statefulset/${KAFKA_NAME} || true
+            """
         }
     }
 }

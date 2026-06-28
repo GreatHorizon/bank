@@ -1,7 +1,7 @@
 package com.example.accounts.service;
 
 import com.example.accounts.error.AccountNotFoundException;
-import com.example.accounts.model.AccountModel;
+import com.example.accounts.model.Account;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.AccountDto;
@@ -45,15 +45,15 @@ class AccountsServiceTest {
 
         accountsService.createAccount(dto, "john");
 
-        ArgumentCaptor<AccountModel> captor = ArgumentCaptor.forClass(AccountModel.class);
+        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
         verify(accountsRepository).save(captor.capture());
 
-        AccountModel saved = captor.getValue();
+        Account saved = captor.getValue();
 
         assertEquals("john", saved.getLogin());
         assertEquals("John", saved.getFirstName());
         assertEquals("Smith", saved.getLastName());
-        assertEquals(dto.birthDate(), saved.getbirthDate());
+        assertEquals(dto.birthDate(), saved.getBirthDate());
         assertEquals(0L, saved.getBalance());
 
         verify(notificationsClient).sendNotification(any());
@@ -61,7 +61,7 @@ class AccountsServiceTest {
 
     @Test
     void createAccountUpdatesExistingAccount() {
-        AccountModel existing = new AccountModel(
+        Account existing = new Account(
                 "john",
                 "Old",
                 "Name",
@@ -82,7 +82,7 @@ class AccountsServiceTest {
 
         assertEquals("John", existing.getFirstName());
         assertEquals("Smith", existing.getLastName());
-        assertEquals(dto.birthDate(), existing.getbirthDate());
+        assertEquals(dto.birthDate(), existing.getBirthDate());
         assertEquals(0L, existing.getBalance());
 
         verify(notificationsClient).sendNotification(any());
@@ -108,7 +108,7 @@ class AccountsServiceTest {
 
     @Test
     void getAccountByLoginReturnsAccountDto() {
-        AccountModel account = new AccountModel(
+        Account account = new Account(
                 "john",
                 "John",
                 "Smith",
@@ -138,14 +138,14 @@ class AccountsServiceTest {
 
     @Test
     void getAccountsForTransferReturnsOtherAccounts() {
-        AccountModel anna = new AccountModel(
+        Account anna = new Account(
                 "anna",
                 "Anna",
                 "Ivanova",
                 LocalDate.of(1995, 1, 1)
         );
 
-        AccountModel petr = new AccountModel(
+        Account petr = new Account(
                 "petr",
                 "Petr",
                 "Petrov",
@@ -183,7 +183,7 @@ class AccountsServiceTest {
 
     @Test
     void putCashIncreasesBalance() {
-        AccountModel account = new AccountModel(
+        Account account = new Account(
                 "john",
                 "John",
                 "Smith",
@@ -229,7 +229,7 @@ class AccountsServiceTest {
 
     @Test
     void getCashDecreasesBalance() {
-        AccountModel account = new AccountModel(
+        Account account = new Account(
                 "john",
                 "John",
                 "Smith",
@@ -238,12 +238,11 @@ class AccountsServiceTest {
         account.setBalance(100L);
 
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 40L)).thenReturn(1);
 
         accountsService.getCash("john", 40L);
 
-        assertEquals(60L, account.getBalance());
-
-        verify(accountsRepository).save(account);
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 40L);
         verify(notificationsClient).sendNotification(any());
     }
 
@@ -261,36 +260,64 @@ class AccountsServiceTest {
     }
 
     @Test
-    void transferMovesMoneyBetweenAccounts() {
-        AccountModel from = new AccountModel(
+    void getCashThrowsIfNoEnoughBalance() {
+        Account account = new Account(
                 "john",
                 "John",
                 "Smith",
                 LocalDate.of(1990, 1, 1)
         );
+
+        account.setBalance(100L);
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 50000L)).thenReturn(0);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.getCash("john", 50000L)
+        );
+
+        assertEquals("Недостаточно средств", exception.getMessage());
+
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 50000L);
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
+    void transferMovesMoneyBetweenAccounts() {
+        Account from = new Account(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+
         from.setBalance(100L);
 
-        AccountModel to = new AccountModel(
+        Account to = new Account(
                 "anna",
                 "Anna",
                 "Ivanova",
                 LocalDate.of(1995, 1, 1)
         );
+
         to.setBalance(20L);
 
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
         when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 30L)).thenReturn(1);
+        when(accountsRepository.deposit("anna", 30L)).thenReturn(1);
 
         accountsService.transfer("john", dto);
 
-        assertEquals(70L, from.getBalance());
-        assertEquals(50L, to.getBalance());
+        verify(accountsRepository).withdrawIfEnoughMoney("john", 30L);
 
-        verify(accountsRepository).save(from);
-        verify(accountsRepository).save(to);
+        verify(accountsRepository).deposit("anna", 30L);
+
+        verify(accountsRepository, never()).save(any());
         verify(notificationsClient).sendNotification(any());
     }
 
@@ -298,7 +325,23 @@ class AccountsServiceTest {
     void transferThrowsIfNotEnoughMoney() {
         TransferMoneyDto dto = new TransferMoneyDto("anna", 300L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
+        Account from = new Account(
+                "john",
+                "John",
+                "Smith",
+                LocalDate.of(1990, 1, 1)
+        );
+
+        Account to = new Account(
+                "anna",
+                "Anna",
+                "Ivanova",
+                LocalDate.of(1995, 1, 1)
+        );
+
+        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
+        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(to));
+        when(accountsRepository.withdrawIfEnoughMoney("john", 300L)).thenReturn(0);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -312,12 +355,25 @@ class AccountsServiceTest {
     }
 
     @Test
+    void transferThrowsIfNegativeSum() {
+        TransferMoneyDto dto = new TransferMoneyDto("anna", -300L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> accountsService.transfer("john", dto)
+        );
+
+        assertEquals("Сумма должна быть больше нуля", exception.getMessage());
+
+        verify(accountsRepository, never()).save(any());
+        verifyNoInteractions(notificationsClient);
+    }
+
+    @Test
     void transferThrowsIfSourceAccountNotFound() {
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
-        when(accountsRepository.findByLogin("anna")).thenReturn(Optional.of(new AccountModel()));
 
         assertThrows(
                 AccountNotFoundException.class,
@@ -330,17 +386,17 @@ class AccountsServiceTest {
 
     @Test
     void transferThrowsIfTargetAccountNotFound() {
-        AccountModel from = new AccountModel(
+        Account from = new Account(
                 "john",
                 "John",
                 "Smith",
                 LocalDate.of(1990, 1, 1)
         );
+
         from.setBalance(100L);
 
         TransferMoneyDto dto = new TransferMoneyDto("anna", 30L);
 
-        when(accountsRepository.findBalanceByLogin("john")).thenReturn(100L);
         when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(from));
         when(accountsRepository.findByLogin("anna")).thenReturn(Optional.empty());
 

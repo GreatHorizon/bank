@@ -6,7 +6,7 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.time.LocalDate;
 
 @Table(name ="accounts")
-public class AccountModel {
+public class Account {
     @Id
     private Long id;
     private String login;
@@ -15,9 +15,9 @@ public class AccountModel {
     private LocalDate dateOfBirth;
     private Long balance;
 
-    public AccountModel() {}
+    public Account() {}
 
-    public AccountModel(String login, String firstName, String lastName, LocalDate dateOfBirth) {
+    public Account(String login, String firstName, String lastName, LocalDate dateOfBirth) {
         this.login = login;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -64,7 +64,7 @@ public class AccountModel {
         return lastName;
     }
 
-    public LocalDate getbirthDate() {
+    public LocalDate getBirthDate() {
         return dateOfBirth;
     }
 
