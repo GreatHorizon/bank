@@ -57,6 +57,18 @@ global:
       type: NodePort
       nodePort: 30090
 
+  grafana:
+    enabled: true
+    name: grafana
+    image: grafana/grafana:11.5.2
+    port: 3000
+    adminUser: admin
+    adminPassword: admin
+    service:
+      type: NodePort
+      port: 80
+      nodePort: 30030
+
 gateway:
   name: gateway
   image: gateway:1.0.5

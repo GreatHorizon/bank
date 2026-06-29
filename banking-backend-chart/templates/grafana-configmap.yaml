@@ -1,0 +1,187 @@
+{{- if and .Values.global.grafana .Values.global.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.global.grafana.name }}-config
+data:
+  prometheus-datasource.yml: |
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ .Values.global.prometheus.name }}:{{ .Values.global.prometheus.port }}
+        isDefault: true
+        editable: true
+
+  dashboards.yml: |
+    apiVersion: 1
+
+    providers:
+      - name: Banking Dashboards
+        orgId: 1
+        folder: Banking
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /etc/grafana/provisioning/dashboards/json
+
+  business-metrics.json: |
+    {
+      "title": "Banking Business Metrics",
+      "uid": "banking-business-metrics",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "timezone": "browser",
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "Failed Cash Withdrawals",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(cash_withdrawal_failed_total[1m])) by (login)",
+              "legendFormat": "{{ "{{login}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Failed Transfers",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(transfer_failed_total[1m])) by (from_login, to_login)",
+              "legendFormat": "{{ "{{from_login}}" }} -> {{ "{{to_login}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Failed Notifications",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(notification_send_failed_total[1m])) by (login)",
+              "legendFormat": "{{ "{{login}}" }}"
+            }
+          ]
+        }
+      ]
+    }
+
+  http-metrics.json: |
+    {
+      "title": "Banking HTTP Metrics",
+      "uid": "banking-http-metrics",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "timezone": "browser",
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "RPS by Application",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count[1m])) by (application)",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "4xx Rate",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{status=~\"4..\"}[1m])) by (application)",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "5xx Rate",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[1m])) by (application)",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "HTTP p95 Latency",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket[5m])) by (le, application))",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        }
+      ]
+    }
+
+  jvm-metrics.json: |
+    {
+      "title": "Banking JVM Metrics",
+      "uid": "banking-jvm-metrics",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "timezone": "browser",
+      "panels": [
+        {
+          "type": "timeseries",
+          "title": "JVM Heap Used",
+          "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (application)",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "JVM Heap Usage %",
+          "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "sum(jvm_memory_used_bytes{area=\"heap\"}) by (application) / sum(jvm_memory_max_bytes{area=\"heap\"}) by (application) * 100",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Process CPU Usage",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "process_cpu_usage",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Live Threads",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "jvm_threads_live_threads",
+              "legendFormat": "{{ "{{application}}" }}"
+            }
+          ]
+        }
+      ]
+    }
+{{- end }}
