@@ -5,6 +5,7 @@ import com.example.shared.dto.NotificationDto;
 import io.micrometer.observation.ObservationRegistry;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -41,13 +42,14 @@ public class NotificationClientConfig {
     @Bean
     public KafkaTemplate<String, NotificationDto> kafkaTemplate(
             ProducerFactory<String, NotificationDto> producerFactory,
-            ObservationRegistry observationRegistry
+            ObjectProvider<ObservationRegistry> observationRegistryProvider
     ) {
         KafkaTemplate<String, NotificationDto> kafkaTemplate = new KafkaTemplate<>(producerFactory);
 
-        kafkaTemplate.setObservationEnabled(true);
-
-        kafkaTemplate.setObservationRegistry(observationRegistry);
+        observationRegistryProvider.ifAvailable(observationRegistry -> {
+            kafkaTemplate.setObservationEnabled(true);
+            kafkaTemplate.setObservationRegistry(observationRegistry);
+        });
 
         return kafkaTemplate;
     }

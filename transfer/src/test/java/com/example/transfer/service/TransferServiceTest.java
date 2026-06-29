@@ -39,11 +39,8 @@ class TransferServiceTest {
         JwtAuthenticationToken authentication = jwtAuthenticationToken("john");
         TransferMoneyDto dto = new TransferMoneyDto("petr", 30L);
 
-        when(accountsClient.getBalance("john")).thenReturn(100L);
-
         transferService.transferMoney(authentication, dto);
 
-        verify(accountsClient).getBalance("john");
         verify(accountsClient).transfer("john", dto);
 
         ArgumentCaptor<NotificationDto> notificationCaptor =
@@ -58,63 +55,6 @@ class TransferServiceTest {
         assertThat(notification.toLogin()).isEqualTo("petr");
     }
 
-    @Test
-    void transferMoneyThrowsWhenAmountIsNull() {
-        JwtAuthenticationToken authentication = jwtAuthenticationToken("john");
-        TransferMoneyDto dto = new TransferMoneyDto("petr", null);
-
-        assertThatThrownBy(() -> transferService.transferMoney(authentication, dto))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Сумма должна быть больше нуля");
-
-        verify(accountsClient, never()).getBalance("john");
-        verify(accountsClient, never()).transfer("john", dto);
-        verify(notificationsClient, never()).sendNotification(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    void transferMoneyThrowsWhenAmountIsZero() {
-        JwtAuthenticationToken authentication = jwtAuthenticationToken("john");
-        TransferMoneyDto dto = new TransferMoneyDto("petr", 0L);
-
-        assertThatThrownBy(() -> transferService.transferMoney(authentication, dto))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Сумма должна быть больше нуля");
-
-        verify(accountsClient, never()).getBalance("john");
-        verify(accountsClient, never()).transfer("john", dto);
-        verify(notificationsClient, never()).sendNotification(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    void transferMoneyThrowsWhenAmountIsNegative() {
-        JwtAuthenticationToken authentication = jwtAuthenticationToken("john");
-        TransferMoneyDto dto = new TransferMoneyDto("petr", -10L);
-
-        assertThatThrownBy(() -> transferService.transferMoney(authentication, dto))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Сумма должна быть больше нуля");
-
-        verify(accountsClient, never()).getBalance("john");
-        verify(accountsClient, never()).transfer("john", dto);
-        verify(notificationsClient, never()).sendNotification(org.mockito.ArgumentMatchers.any());
-    }
-
-    @Test
-    void transferMoneyThrowsWhenBalanceIsNotEnough() {
-        JwtAuthenticationToken authentication = jwtAuthenticationToken("john");
-        TransferMoneyDto dto = new TransferMoneyDto("petr", 150L);
-
-        when(accountsClient.getBalance("john")).thenReturn(100L);
-
-        assertThatThrownBy(() -> transferService.transferMoney(authentication, dto))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Недостаточно средств");
-
-        verify(accountsClient).getBalance("john");
-        verify(accountsClient, never()).transfer("john", dto);
-        verify(notificationsClient, never()).sendNotification(org.mockito.ArgumentMatchers.any());
-    }
 
     private JwtAuthenticationToken jwtAuthenticationToken(String login) {
         Map<String, Object> claims = login == null

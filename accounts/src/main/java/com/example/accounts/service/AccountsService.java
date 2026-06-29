@@ -51,10 +51,23 @@ public class AccountsService {
                         )
                 );
 
+        final var existingAccount = account.getId() != null;
+
         account.setFirstName(nameParts.firstName());
         account.setLastName(nameParts.lastName());
         account.setBirthDate(createAccountDto.birthDate());
-        account.setBalance(0L);
+
+        if (existingAccount) {
+            log.info("Account profile updated without balance reset: login={}, balance={}",
+                    login, account.getBalance());
+
+        } else {
+            log.info("Account created: login={}", login);
+            account.setBalance(0L);
+        }
+
+        accountsRepository.save(account);
+
 
         log.info("Sending cash createAccount notification: login={}", login);
 
@@ -80,9 +93,9 @@ public class AccountsService {
                 .stream()
                 .map(model ->
                         new AccountForTransferDto(
-                                model.getLogin(),
-                                model.getFirstName(),
-                                model.getLastName()
+                                model.login(),
+                                model.firstName(),
+                                model.lastName()
                         )
                 ).toList();
 
@@ -125,14 +138,13 @@ public class AccountsService {
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        Account account = accountsRepository.findByLogin(login)
-                .orElseThrow(() -> new AccountNotFoundException(login));
+        final var depositedRows = accountsRepository.deposit(login, amount);
 
-        final var newBalance = account.getBalance() + amount;
+        if (depositedRows == 0) {
+            log.warn("Account not found for transfer: login={}", login);
 
-        account.setBalance(newBalance);
-
-        accountsRepository.save(account);
+            throw new AccountNotFoundException(login);
+        }
 
         log.info("Sending cash putCash notification: login={}", login);
 

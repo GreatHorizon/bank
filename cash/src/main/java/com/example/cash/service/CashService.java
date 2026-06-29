@@ -58,12 +58,7 @@ public class CashService {
     }
 
     private void performGetCash(String login, Long amount) {
-        final var balance = accountsClient.getBalance(login);
-
-        if (amount > balance) {
-            log.warn("Wrong balance={}", login);
-            throw new IllegalArgumentException("Amount greater than balance");
-        }
+        log.info("Sending getCash request to accounts");
 
         accountsClient.getCash(login, amount);
 

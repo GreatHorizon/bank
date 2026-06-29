@@ -55,11 +55,8 @@ class CashServiceTest {
     void getCashWithdrawsCashAndSendsNotificationWhenBalanceIsEnough() {
         JwtAuthenticationToken authentication = authentication("john");
 
-        when(accountsClient.getBalance("john")).thenReturn(100L);
-
         cashService.getCash(authentication, 40L);
 
-        verify(accountsClient).getBalance("john");
         verify(accountsClient).getCash("john", 40L);
 
         ArgumentCaptor<NotificationDto> notificationCaptor =
@@ -71,21 +68,6 @@ class CashServiceTest {
 
         assertThat(notification.amount()).isEqualTo(40L);
         assertThat(notification.login()).isEqualTo("john");
-    }
-
-    @Test
-    void getCashThrowsExceptionWhenAmountGreaterThanBalance() {
-        JwtAuthenticationToken authentication = authentication("john");
-
-        when(accountsClient.getBalance("john")).thenReturn(30L);
-
-        assertThatThrownBy(() -> cashService.getCash(authentication, 40L))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Amount greater than balance");
-
-        verify(accountsClient).getBalance("john");
-        verify(accountsClient, never()).getCash("john", 40L);
-        verify(notificationsClient, never()).sendNotification(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

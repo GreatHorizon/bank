@@ -28,18 +28,7 @@ public class TransferService {
 
 
     private void performTransferMoney(String login, TransferMoneyDto transferMoneyDto) {
-        if (transferMoneyDto.amount() == null || transferMoneyDto.amount() <= 0) {
-            log.warn("Transfer money amount is null or amount <= 0");
-            throw new IllegalArgumentException("Сумма должна быть больше нуля");
-        }
-
-        final var fromBalance = accountsClient.getBalance(login);
-
-        if (fromBalance < transferMoneyDto.amount()) {
-            log.warn("Not enough balance for transfer money. login={}", login);
-
-            throw new IllegalArgumentException("Недостаточно средств");
-        }
+        log.info("Sending transfer request to accounts");
 
         accountsClient.transfer(login, transferMoneyDto);
 

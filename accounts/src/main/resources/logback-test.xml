@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} level=%level thread=%thread logger=%logger{36} message="%msg"%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="zipkin2" level="OFF"/>
+    <logger name="zipkin2.reporter" level="OFF"/>
+    <logger name="net.logstash.logback" level="OFF"/>
+    <logger name="org.apache.kafka" level="WARN"/>
+    <logger name="org.testcontainers" level="INFO"/>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
