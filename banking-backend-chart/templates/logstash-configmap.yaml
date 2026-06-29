@@ -1,0 +1,43 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.global.elk.logstash.name }}-config
+data:
+  logstash.conf: |
+    input {
+      tcp {
+        port => 5000
+        codec => json_lines
+      }
+    }
+
+    filter {
+      mutate {
+        add_field => {
+          "environment" => "k8s"
+        }
+      }
+
+      if [message] {
+        mutate {
+          gsub => [
+            "message", "password=[^,\\s]+", "password=***",
+            "message", "accountNumber=[0-9]+", "accountNumber=***",
+            "message", "cardNumber=[0-9]+", "cardNumber=***"
+          ]
+        }
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => ["http://elasticsearch:9200"]
+        index => "banking-logs-%{+YYYY.MM.dd}"
+      }
+
+      stdout {
+        codec => rubydebug
+      }
+    }
+{{- end }}

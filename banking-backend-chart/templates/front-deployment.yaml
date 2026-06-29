@@ -47,6 +47,12 @@ spec:
             - name: JAVA_TOOL_OPTIONS
               value: "-Xms128m -Xmx256m"
 
+            - name: APP_LOGSTASH_HOST
+              value: "logstash"
+
+            - name: APP_LOGSTASH_PORT
+              value: "5000"
+
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness

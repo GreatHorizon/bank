@@ -1,0 +1,37 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.elk.logstash.name }}
+  labels:
+    app: {{ .Values.global.elk.logstash.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.elk.logstash.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.elk.logstash.name }}
+    spec:
+      containers:
+        - name: {{ .Values.global.elk.logstash.name }}
+          image: {{ .Values.global.elk.logstash.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: tcp
+              containerPort: {{ .Values.global.elk.logstash.port }}
+          env:
+            - name: LS_JAVA_OPTS
+              value: "-Xms256m -Xmx256m"
+          volumeMounts:
+            - name: logstash-config
+              mountPath: /usr/share/logstash/pipeline/logstash.conf
+              subPath: logstash.conf
+      volumes:
+        - name: logstash-config
+          configMap:
+            name: {{ .Values.global.elk.logstash.name }}-config
+{{- end }}

@@ -44,6 +44,12 @@ spec:
             - name: NOTIFICATIONS_SERVICE_URL
               value: "http://{{ .Values.services.notifications.name }}:{{ .Values.services.notifications.port }}"
 
+            - name: APP_LOGSTASH_HOST
+              value: "logstash"
+
+            - name: APP_LOGSTASH_PORT
+              value: "5000"
+
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness

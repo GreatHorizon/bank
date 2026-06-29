@@ -1,0 +1,42 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.elk.elasticsearch.name }}
+  labels:
+    app: {{ .Values.global.elk.elasticsearch.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.elk.elasticsearch.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.elk.elasticsearch.name }}
+    spec:
+      containers:
+        - name: {{ .Values.global.elk.elasticsearch.name }}
+          image: {{ .Values.global.elk.elasticsearch.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.elk.elasticsearch.port }}
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.security.http.ssl.enabled
+              value: "false"
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+          resources:
+            requests:
+              memory: "768Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+{{- end }}

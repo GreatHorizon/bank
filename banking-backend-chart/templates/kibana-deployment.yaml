@@ -1,0 +1,31 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.elk.kibana.name }}
+  labels:
+    app: {{ .Values.global.elk.kibana.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.elk.kibana.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.elk.kibana.name }}
+    spec:
+      containers:
+        - name: {{ .Values.global.elk.kibana.name }}
+          image: {{ .Values.global.elk.kibana.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.elk.kibana.port }}
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: "http://{{ .Values.global.elk.elasticsearch.name }}:{{ .Values.global.elk.elasticsearch.service.port }}"
+            - name: XPACK_SECURITY_ENABLED
+              value: "false"
+{{- end }}

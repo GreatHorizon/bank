@@ -75,6 +75,11 @@ spec:
             {{- end }}
             - name: MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT
               value: "http://{{ $.Values.global.zipkin.name }}:{{ $.Values.global.zipkin.port }}/api/v2/spans"
+            - name: APP_LOGSTASH_HOST
+              value: "logstash"
+
+            - name: APP_LOGSTASH_PORT
+              value: "5000"
 
 
           readinessProbe:
