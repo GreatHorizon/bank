@@ -3,6 +3,7 @@ package com.example.front.client;
 import com.example.shared.dto.AccountForTransferDto;
 import com.example.shared.dto.AccountDto;
 import com.example.shared.dto.CreateAccountDto;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -21,11 +22,13 @@ public class AccountsClient {
 
     public AccountsClient(
             OAuth2AuthorizedClientService authorizedClientService,
-            RestClient.Builder restClientBuilder
+            RestClient.Builder restClientBuilder,
+            @Value("${app.gateway.base-url}")
+            String gatewayBaseUrl
     ) {
         this.authorizedClientService = authorizedClientService;
         this.restClient = restClientBuilder
-                .baseUrl("http://localhost:30080")
+                .baseUrl(gatewayBaseUrl)
                 .build();
     }
 

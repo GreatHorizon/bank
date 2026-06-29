@@ -1,5 +1,6 @@
 package com.example.front.client;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -14,11 +15,13 @@ public class CashClient {
 
     public CashClient(
             OAuth2AuthorizedClientService authorizedClientService,
-            RestClient.Builder restClientBuilder
+            RestClient.Builder restClientBuilder,
+            @Value("${app.gateway.base-url}")
+            String gatewayBaseUrl
     ) {
         this.authorizedClientService = authorizedClientService;
         this.restClient = restClientBuilder
-                .baseUrl("http://localhost:30080")
+                .baseUrl(gatewayBaseUrl)
                 .build();
     }
 

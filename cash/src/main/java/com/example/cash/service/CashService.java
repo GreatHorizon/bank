@@ -1,6 +1,7 @@
 package com.example.cash.service;
 
 import com.example.cash.client.AccountsClient;
+import com.example.cash.metrics.CashMetrics;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.NotificationDto;
 import org.springframework.security.core.Authentication;
@@ -12,10 +13,12 @@ public class CashService {
 
     final AccountsClient accountsClient;
     final NotificationsClient notificationsClient;
+    final CashMetrics cashMetrics;
 
-    public CashService(AccountsClient accountsClient, NotificationsClient notificationsClient) {
+    public CashService(AccountsClient accountsClient, NotificationsClient notificationsClient, CashMetrics cashMetrics) {
         this.accountsClient = accountsClient;
         this.notificationsClient = notificationsClient;
+        this.cashMetrics = cashMetrics;
     }
 
 
@@ -37,6 +40,16 @@ public class CashService {
     public void getCash(Authentication authentication, Long amount) {
         final var login = getLogin(authentication);
 
+        try {
+            performGetCash(login, amount);
+        } catch (Exception e) {
+            cashMetrics.failedWithdrawal(login);
+
+            throw e;
+        }
+    }
+
+    private void performGetCash(String login, Long amount) {
         final var balance = accountsClient.getBalance(login);
 
         if (amount > balance) {

@@ -1,0 +1,63 @@
+{{- if .Values.front.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.front.name }}
+  labels:
+    app: {{ .Values.front.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.front.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.front.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.front.name }}
+    spec:
+      containers:
+        - name: {{ .Values.front.name }}
+          image: {{ .Values.front.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy | default "Never" }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.front.port }}
+
+
+          env:
+            - name: SERVER_PORT
+              value: "8084"
+
+            - name: APP_GATEWAY_BASE_URL
+              value: "http://gateway:80"
+
+            - name: MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT
+              value: "http://zipkin:9411/api/v2/spans"
+
+            - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
+              value: "http://192.168.0.113:9090/realms/master"
+
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: front-secret
+                  key: CLIENT_SECRET
+
+            - name: JAVA_TOOL_OPTIONS
+              value: "-Xms128m -Xmx256m"
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+{{- end }}
