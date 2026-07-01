@@ -209,40 +209,40 @@ pipeline {
             }
         }
 
-       stage('Verify Kafka Topics') {
-           when {
-               expression { return params.RUN_DEPLOY }
-           }
-           steps {
-               sh """
-                   echo "Waiting for Kafka topics job..."
+        stage('Verify Kafka Topics') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    echo "Waiting for Kafka topics job..."
 
-                   kubectl wait \
-                     --for=condition=complete \
-                     job/${RELEASE_NAME}-kafka-topics \
-                     --timeout=180s || true
+                    kubectl wait \
+                      --for=condition=complete \
+                      job/${RELEASE_NAME}-kafka-topics \
+                      --timeout=180s || true
 
-                   echo "Kafka topics:"
-                   kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
-                     --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
-                     --list
+                    echo "Kafka topics:"
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list
 
-                   kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
-                     --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
-                     --list | grep -q '^accounts-events\\$'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^accounts-events\$'
 
-                   kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
-                     --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
-                     --list | grep -q '^cash-events\\$'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^cash-events\$'
 
-                   kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
-                     --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
-                     --list | grep -q '^transfer-events\\$'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^transfer-events\$'
 
-                   echo "Kafka topics OK"
-               """
-           }
-       }
+                    echo "Kafka topics OK"
+                """
+            }
+        }
 
         stage('Helm Tests') {
             when {
