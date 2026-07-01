@@ -1,5 +1,7 @@
 package com.example.shared.config;
 
+import com.example.shared.client.KafkaNotificationsClient;
+import com.example.shared.client.NoopNotificationsClient;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.NotificationDto;
 import io.micrometer.observation.ObservationRegistry;
@@ -7,9 +9,9 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
@@ -18,15 +20,12 @@ import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
-@Configuration
-@ConditionalOnProperty(
-        name = "app.kafka.producer.enabled",
-        havingValue = "true",
-        matchIfMissing = false
-)
 public class NotificationClientConfig {
-
     @Bean
+    @ConditionalOnProperty(
+            name = "app.kafka.producer.enabled",
+            havingValue = "true"
+    )
     public ProducerFactory<String, NotificationDto> producerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers
     ) {
@@ -48,6 +47,10 @@ public class NotificationClientConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(
+            name = "app.kafka.producer.enabled",
+            havingValue = "true"
+    )
     public KafkaTemplate<String, NotificationDto> kafkaTemplate(
             ProducerFactory<String, NotificationDto> producerFactory,
             ObjectProvider<ObservationRegistry> observationRegistryProvider
@@ -63,10 +66,20 @@ public class NotificationClientConfig {
     }
 
     @Bean
-    public NotificationsClient notificationsClient(
+    @ConditionalOnProperty(
+            name = "app.kafka.producer.enabled",
+            havingValue = "true"
+    )
+    public KafkaNotificationsClient notificationsClient(
             KafkaTemplate<String, NotificationDto> kafkaTemplate,
             @Value("${app.kafka.topic}") String topic
     ) {
-        return new NotificationsClient(kafkaTemplate, topic);
+        return new KafkaNotificationsClient(kafkaTemplate, topic);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(NotificationsClient.class)
+    public NotificationsClient noopNotificationsClient() {
+        return new NoopNotificationsClient();
     }
 }
