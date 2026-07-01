@@ -21,16 +21,12 @@ pipeline {
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
 
-        REGISTRY = "ghcr.io"
-        IMAGE_NAMESPACE = "greathorizon/bank"
-        DOCKER_REGISTRY_CREDENTIALS = "ghcr-credentials"
-
-        ACCOUNTS_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/accounts-service:${BUILD_NUMBER}"
-        CASH_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/cash-service:${BUILD_NUMBER}"
-        TRANSFER_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/transfer-service:${BUILD_NUMBER}"
-        NOTIFICATIONS_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/notifications-service:${BUILD_NUMBER}"
-        GATEWAY_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/gateway:${BUILD_NUMBER}"
-        FRONT_IMAGE = "${REGISTRY}/${IMAGE_NAMESPACE}/front:${BUILD_NUMBER}"
+        ACCOUNTS_IMAGE = "local/accounts-service:${BUILD_NUMBER}"
+        CASH_IMAGE = "local/cash-service:${BUILD_NUMBER}"
+        TRANSFER_IMAGE = "local/transfer-service:${BUILD_NUMBER}"
+        NOTIFICATIONS_IMAGE = "local/notifications-service:${BUILD_NUMBER}"
+        GATEWAY_IMAGE = "local/gateway:${BUILD_NUMBER}"
+        FRONT_IMAGE = "local/front:${BUILD_NUMBER}"
 
         KAFKA_NAME = "kafka"
         KAFKA_PORT = "9092"
@@ -50,9 +46,9 @@ pipeline {
             steps {
                 sh 'mvn -version'
                 sh 'helm version'
-                sh '''
-                    helm lint "$CHART_PATH"
-                '''
+                sh """
+                    helm lint ${CHART_PATH}
+                """
             }
         }
 
@@ -75,77 +71,41 @@ pipeline {
             }
         }
 
-        stage('Docker Login') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}",
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login "$REGISTRY" \
-                          -u "$DOCKER_USERNAME" \
-                          --password-stdin
-                    '''
-                }
-            }
-        }
-
-        stage('Build and Push Docker Images') {
+        stage('Build Docker Images') {
             parallel {
                 stage('accounts-service') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$ACCOUNTS_IMAGE" ./accounts
-                            docker push "$ACCOUNTS_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${ACCOUNTS_IMAGE} ./accounts"
                     }
                 }
 
                 stage('cash-service') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$CASH_IMAGE" ./cash
-                            docker push "$CASH_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${CASH_IMAGE} ./cash"
                     }
                 }
 
                 stage('transfer-service') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$TRANSFER_IMAGE" ./transfer
-                            docker push "$TRANSFER_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${TRANSFER_IMAGE} ./transfer"
                     }
                 }
 
                 stage('notifications-service') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$NOTIFICATIONS_IMAGE" ./notifications
-                            docker push "$NOTIFICATIONS_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${NOTIFICATIONS_IMAGE} ./notifications"
                     }
                 }
 
                 stage('gateway') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$GATEWAY_IMAGE" ./gateway
-                            docker push "$GATEWAY_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${GATEWAY_IMAGE} ./gateway"
                     }
                 }
 
                 stage('front') {
                     steps {
-                        sh '''
-                            docker build --no-cache -t "$FRONT_IMAGE" ./front
-                            docker push "$FRONT_IMAGE"
-                        '''
+                        sh "docker build --no-cache -t ${FRONT_IMAGE} ./front"
                     }
                 }
             }
@@ -161,22 +121,21 @@ pipeline {
                     withCredentials([
                         file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
                     ]) {
-                        sh '''
-                            helm template "$RELEASE_NAME" "$CHART_PATH" \
-                              -f "$CHART_PATH/values.yaml" \
-                              -f "$SECRET_VALUES_FILE" \
-                              --set global.imagePullPolicy=IfNotPresent \
-                              --set gateway.image="$GATEWAY_IMAGE" \
-                              --set front.enabled=true \
-                              --set front.image="$FRONT_IMAGE" \
-                              --set services.accounts.image="$ACCOUNTS_IMAGE" \
-                              --set services.cash.image="$CASH_IMAGE" \
-                              --set services.transfer.image="$TRANSFER_IMAGE" \
-                              --set services.notifications.image="$NOTIFICATIONS_IMAGE" \
+                        sh """
+                            helm template ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
+                              --set global.imagePullPolicy=Never \
+                              --set gateway.image=${GATEWAY_IMAGE} \
+                              --set front.image=${FRONT_IMAGE} \
+                              --set services.accounts.image=${ACCOUNTS_IMAGE} \
+                              --set services.cash.image=${CASH_IMAGE} \
+                              --set services.transfer.image=${TRANSFER_IMAGE} \
+                              --set services.notifications.image=${NOTIFICATIONS_IMAGE} \
                               > rendered.yaml
 
                             kubectl apply --dry-run=client -f rendered.yaml
-                        '''
+                        """
                     }
                 }
             }
@@ -195,31 +154,31 @@ pipeline {
                     withCredentials([
                         file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
                     ]) {
-                        sh '''
-                            helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
-                              -f "$CHART_PATH/values.yaml" \
-                              -f "$SECRET_VALUES_FILE" \
+                        sh """
+                            helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
                               --wait \
                               --timeout 10m \
-                              --set global.imagePullPolicy=IfNotPresent \
+                              --set global.imagePullPolicy=Never \
                               --set global.kafka.enabled=true \
-                              --set global.kafka.name="$KAFKA_NAME" \
-                              --set global.kafka.port="$KAFKA_PORT" \
-                              --set gateway.image="$GATEWAY_IMAGE" \
+                              --set global.kafka.name=${KAFKA_NAME} \
+                              --set global.kafka.port=${KAFKA_PORT} \
+                              --set gateway.image=${GATEWAY_IMAGE} \
                               --set front.enabled=true \
-                              --set front.image="$FRONT_IMAGE" \
-                              --set services.accounts.image="$ACCOUNTS_IMAGE" \
+                              --set front.image=${FRONT_IMAGE} \
+                              --set services.accounts.image=${ACCOUNTS_IMAGE} \
                               --set services.accounts.kafka.producer.enabled=true \
                               --set services.accounts.kafka.topic=accounts-events \
-                              --set services.cash.image="$CASH_IMAGE" \
+                              --set services.cash.image=${CASH_IMAGE} \
                               --set services.cash.kafka.producer.enabled=true \
                               --set services.cash.kafka.topic=cash-events \
-                              --set services.transfer.image="$TRANSFER_IMAGE" \
+                              --set services.transfer.image=${TRANSFER_IMAGE} \
                               --set services.transfer.kafka.producer.enabled=true \
                               --set services.transfer.kafka.topic=transfer-events \
-                              --set services.notifications.image="$NOTIFICATIONS_IMAGE" \
+                              --set services.notifications.image=${NOTIFICATIONS_IMAGE} \
                               --set services.notifications.kafka.consumer.enabled=true
-                        '''
+                        """
                     }
                 }
             }
@@ -230,8 +189,8 @@ pipeline {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh '''
-                    kubectl rollout status statefulset/"$KAFKA_NAME" --timeout=180s || true
+                sh """
+                    kubectl rollout status statefulset/${KAFKA_NAME} --timeout=180s || true
 
                     kubectl rollout status deployment/accounts-service --timeout=180s
                     kubectl rollout status deployment/cash-service --timeout=180s
@@ -246,7 +205,7 @@ pipeline {
                     kubectl rollout status deployment/elasticsearch --timeout=180s || true
                     kubectl rollout status deployment/logstash --timeout=180s || true
                     kubectl rollout status deployment/kibana --timeout=180s || true
-                '''
+                """
             }
         }
 
@@ -255,33 +214,33 @@ pipeline {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh '''
+                sh """
                     echo "Waiting for Kafka topics job..."
 
                     kubectl wait \
                       --for=condition=complete \
-                      job/"$RELEASE_NAME"-kafka-topics \
+                      job/${RELEASE_NAME}-kafka-topics \
                       --timeout=180s || true
 
                     echo "Kafka topics:"
-                    kubectl exec "$KAFKA_NAME"-0 -- /opt/kafka/bin/kafka-topics.sh \
-                      --bootstrap-server "$KAFKA_NAME":"$KAFKA_PORT" \
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
                       --list
 
-                    kubectl exec "$KAFKA_NAME"-0 -- /opt/kafka/bin/kafka-topics.sh \
-                      --bootstrap-server "$KAFKA_NAME":"$KAFKA_PORT" \
-                      --list | grep -q '^accounts-events'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^accounts-events\$'
 
-                    kubectl exec "$KAFKA_NAME"-0 -- /opt/kafka/bin/kafka-topics.sh \
-                      --bootstrap-server "$KAFKA_NAME":"$KAFKA_PORT" \
-                      --list | grep -q '^cash-events'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^cash-events\$'
 
-                    kubectl exec "$KAFKA_NAME"-0 -- /opt/kafka/bin/kafka-topics.sh \
-                      --bootstrap-server "$KAFKA_NAME":"$KAFKA_PORT" \
-                      --list | grep -q '^transfer-events'
+                    kubectl exec ${KAFKA_NAME}-0 -- /opt/kafka/bin/kafka-topics.sh \
+                      --bootstrap-server ${KAFKA_NAME}:${KAFKA_PORT} \
+                      --list | grep -q '^transfer-events\$'
 
                     echo "Kafka topics OK"
-                '''
+                """
             }
         }
 
@@ -290,9 +249,7 @@ pipeline {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh '''
-                    helm test "$RELEASE_NAME" --logs
-                '''
+                sh "helm test ${RELEASE_NAME} --logs"
             }
         }
     }
@@ -305,14 +262,14 @@ pipeline {
         failure {
             echo "Umbrella pipeline failed"
 
-            sh '''
+            sh """
                 kubectl get pods || true
                 kubectl get svc || true
                 kubectl get jobs || true
 
-                kubectl logs job/"$RELEASE_NAME"-kafka-topics || true
+                kubectl logs job/${RELEASE_NAME}-kafka-topics || true
 
-                kubectl logs statefulset/"$KAFKA_NAME" || true
+                kubectl logs statefulset/${KAFKA_NAME} || true
                 kubectl logs deployment/accounts-service || true
                 kubectl logs deployment/cash-service || true
                 kubectl logs deployment/transfer-service || true
@@ -321,7 +278,7 @@ pipeline {
                 kubectl logs deployment/front || true
                 kubectl logs deployment/logstash || true
                 kubectl logs deployment/elasticsearch || true
-            '''
+            """
         }
     }
 }
