@@ -29,6 +29,6 @@ public class NotificationsService {
     }
 
     private void performWriteNotification(NotificationDto notificationDto) {
-        System.out.println("notification " + notificationDto.toString());
+        log.info("notification " + notificationDto.toString());
     }
 }
