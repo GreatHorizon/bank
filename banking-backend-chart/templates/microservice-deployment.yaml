@@ -40,32 +40,18 @@ spec:
                   key: CLIENT_SECRET
             {{- end }}
 
-            {{- if $svc.kafka }}
-            - name: KAFKA_TOPIC
-              value: {{ $svc.kafka.topic | quote }}
-            - name: APP_KAFKA_TOPIC
-              value: {{ $svc.kafka.topic | quote }}
+            {{- if and $.Values.global.kafka.enabled $svc.kafka $svc.kafka.producer $svc.kafka.producer.enabled }}
             - name: APP_KAFKA_PRODUCER_ENABLED
               value: "true"
+            - name: APP_KAFKA_TOPIC
+              value: {{ $svc.kafka.topic | quote }}
+            - name: KAFKA_TOPIC
+              value: {{ $svc.kafka.topic | quote }}
             {{- end }}
 
-            {{- if and $svc.db $svc.db.enabled }}
-            - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://{{ $svc.db.name }}:{{ $svc.db.port }}/{{ $svc.db.database }}"
-
-            - name: SPRING_DATASOURCE_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $svc.db.name }}-secret
-                  key: username
-
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $svc.db.name }}-secret
-                  key: password
-            {{- end }}
-            {{- if eq $key "notifications" }}
+            {{- if and (eq $key "notifications") $.Values.global.kafka.enabled $svc.kafka $svc.kafka.consumer $svc.kafka.consumer.enabled }}
+            - name: APP_KAFKA_CONSUMER_ENABLED
+              value: "true"
             - name: APP_KAFKA_TOPICS_ACCOUNTS_EVENTS
               value: {{ $.Values.global.kafka.topics.accountsEvents | quote }}
             - name: APP_KAFKA_TOPICS_CASH_EVENTS
@@ -73,14 +59,28 @@ spec:
             - name: APP_KAFKA_TOPICS_TRANSFER_EVENTS
               value: {{ $.Values.global.kafka.topics.transferEvents | quote }}
             {{- end }}
+
+            {{- if and $svc.db $svc.db.enabled }}
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ $svc.db.name }}:{{ $svc.db.port }}/{{ $svc.db.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $svc.db.name }}-secret
+                  key: password
+            {{- end }}
+
             - name: MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT
               value: "http://{{ $.Values.global.zipkin.name }}:{{ $.Values.global.zipkin.port }}/api/v2/spans"
             - name: APP_LOGSTASH_HOST
               value: "logstash"
-
             - name: APP_LOGSTASH_PORT
               value: "5000"
-
 
           readinessProbe:
             httpGet:

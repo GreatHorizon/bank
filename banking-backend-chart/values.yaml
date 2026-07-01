@@ -181,3 +181,6 @@ services:
     replicas: 1
     keycloak:
       clientSecret: ""
+    kafka:
+      consumer:
+        enabled: true
