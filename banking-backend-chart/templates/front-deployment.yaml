@@ -27,16 +27,16 @@ spec:
 
           env:
             - name: SERVER_PORT
-              value: "8084"
+              value: {{ .Values.front.port | quote }}
 
             - name: APP_GATEWAY_BASE_URL
-              value: "http://gateway:80"
+              value: "http://{{ .Values.gateway.name }}:{{ .Values.gateway.service.port }}"
 
             - name: MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT
-              value: "http://zipkin:9411/api/v2/spans"
+              value: "http://{{ .Values.global.zipkin.name }}:{{ .Values.global.zipkin.port }}/api/v2/spans"
 
             - name: SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI
-              value: "http://192.168.0.113:9090/realms/master"
+              value: {{ .Values.global.keycloak.issuerUri | quote }}
 
             - name: CLIENT_SECRET
               valueFrom:
@@ -48,10 +48,10 @@ spec:
               value: "-Xms128m -Xmx256m"
 
             - name: APP_LOGSTASH_HOST
-              value: "logstash"
+              value: {{ .Values.global.elk.logstash.name | quote }}
 
             - name: APP_LOGSTASH_PORT
-              value: "5000"
+              value: {{ .Values.global.elk.logstash.port | quote }}
 
           readinessProbe:
             httpGet:
