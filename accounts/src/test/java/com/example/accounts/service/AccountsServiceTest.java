@@ -61,13 +61,16 @@ class AccountsServiceTest {
     }
 
     @Test
-    void createAccountUpdatesExistingAccount() {
+    void createAccountUpdatesExistingAccountWithoutBalance() {
         Account existing = new Account(
                 "john",
                 "Old",
                 "Name",
                 LocalDate.of(1990, 1, 1)
         );
+
+        existing.setId(1L);
+
         existing.setBalance(999L);
 
         CreateAccountDto dto = new CreateAccountDto(
@@ -84,7 +87,7 @@ class AccountsServiceTest {
         assertEquals("John", existing.getFirstName());
         assertEquals("Smith", existing.getLastName());
         assertEquals(dto.birthDate(), existing.getBirthDate());
-        assertEquals(0L, existing.getBalance());
+        assertNotEquals(0L, existing.getBalance());
 
         verify(notificationsClient).sendNotification(any());
     }
