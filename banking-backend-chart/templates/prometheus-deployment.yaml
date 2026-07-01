@@ -1,0 +1,44 @@
+{{- if and .Values.global.prometheus .Values.global.prometheus.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.prometheus.name }}
+  labels:
+    app: {{ .Values.global.prometheus.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.prometheus.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.prometheus.name }}
+    spec:
+      containers:
+        - name: prometheus
+          image: {{ .Values.global.prometheus.image }}
+          imagePullPolicy: {{ .Values.global.prometheus.imagePullPolicy | default "IfNotPresent" }}
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.prometheus.port }}
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+{{- end }}

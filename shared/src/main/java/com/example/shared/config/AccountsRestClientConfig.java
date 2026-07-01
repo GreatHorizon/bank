@@ -17,6 +17,7 @@ public class AccountsRestClientConfig {
     @Bean
     public RestClient accountsRestClient(
             @Value("${accounts.base-url:http://accounts-service:8080}") String accountsBaseUrl,
+            RestClient.Builder restClientBuilder,
             ClientRegistrationRepository clientRegistrationRepository,
             OAuth2AuthorizedClientService authorizedClientService
     ) {
@@ -38,7 +39,7 @@ public class AccountsRestClientConfig {
 
         interceptor.setClientRegistrationIdResolver(request -> "keycloak");
 
-        return RestClient.builder()
+        return restClientBuilder
                 .baseUrl(accountsBaseUrl)
                 .requestInterceptor(interceptor)
                 .build();

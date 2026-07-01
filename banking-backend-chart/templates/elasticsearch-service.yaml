@@ -1,0 +1,18 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.elk.elasticsearch.name }}
+  labels:
+    app: {{ .Values.global.elk.elasticsearch.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.global.elk.elasticsearch.service.type }}
+  selector:
+    app: {{ .Values.global.elk.elasticsearch.name }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.global.elk.elasticsearch.service.port }}
+      targetPort: http
+{{- end }}

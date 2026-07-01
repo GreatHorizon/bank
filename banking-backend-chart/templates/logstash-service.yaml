@@ -1,0 +1,18 @@
+{{- if and .Values.global.elk .Values.global.elk.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.elk.logstash.name }}
+  labels:
+    app: {{ .Values.global.elk.logstash.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.global.elk.logstash.service.type }}
+  selector:
+    app: {{ .Values.global.elk.logstash.name }}
+  ports:
+    - name: tcp
+      protocol: TCP
+      port: {{ .Values.global.elk.logstash.service.port }}
+      targetPort: tcp
+{{- end }}

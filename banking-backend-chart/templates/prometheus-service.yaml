@@ -1,0 +1,21 @@
+{{- if and .Values.global.prometheus .Values.global.prometheus.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.prometheus.name }}
+  labels:
+    app: {{ .Values.global.prometheus.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.global.prometheus.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ .Values.global.prometheus.name }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.global.prometheus.port }}
+      targetPort: http
+      {{- if eq (.Values.global.prometheus.service.type | default "ClusterIP") "NodePort" }}
+      nodePort: {{ .Values.global.prometheus.service.nodePort }}
+      {{- end }}
+{{- end }}

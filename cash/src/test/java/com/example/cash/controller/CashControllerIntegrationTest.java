@@ -75,22 +75,25 @@ class CashControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        verify(accountsClient).getBalance("john");
         verify(accountsClient).getCash("john", 40L);
         verify(notificationsClient).sendNotification(any(NotificationDto.class));
     }
 
     @Test
-    void getCashReturnsServerErrorWhenAmountGreaterThanBalance() throws Exception {
-        when(accountsClient.getBalance("john")).thenReturn(30L);
+
+    void getCashReturnsBadRequestWhenAccountsServiceRejectsWithdrawal() throws Exception {
+        doThrow(new IllegalArgumentException("Недостаточно средств"))
+                .when(accountsClient)
+                .getCash("john", 40L);
 
         mockMvc.perform(post("/api/cash")
                         .with(jwt().jwt(jwt -> jwt.claim("preferred_username", "john")))
                         .param("amount", "40")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().is4xxClientError());
+                .andExpect(status().isBadRequest());
 
-        verify(accountsClient).getBalance("john");
+        verify(accountsClient).getCash("john", 40L);
+        verifyNoInteractions(notificationsClient);
     }
 
     @TestConfiguration

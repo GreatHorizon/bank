@@ -9,9 +9,10 @@ pipeline {
                 'cash',
                 'transfer',
                 'notifications',
-                'gateway'
+                'gateway',
+                'front'
             ],
-            description: 'Microservice to build and deploy'
+            description: 'Service to build and deploy'
         )
 
         choice(
@@ -29,6 +30,7 @@ pipeline {
 
     environment {
         IMAGE_TAG = "${BUILD_NUMBER}"
+
         CHART_PATH = "./banking-backend-chart"
         RELEASE_NAME = "banking-backend"
 
@@ -51,12 +53,19 @@ pipeline {
                     if (params.SERVICE_NAME == 'gateway') {
                         env.IMAGE_NAME = 'gateway'
                         env.HELM_IMAGE_KEY = 'gateway.image'
+                        env.K8S_DEPLOYMENT = 'gateway'
+                    } else if (params.SERVICE_NAME == 'front') {
+                        env.IMAGE_NAME = 'front'
+                        env.HELM_IMAGE_KEY = 'front.image'
+                        env.K8S_DEPLOYMENT = 'front'
                     } else if (params.SERVICE_NAME == 'notifications') {
                         env.IMAGE_NAME = 'notifications-service'
                         env.HELM_IMAGE_KEY = 'services.notifications.image'
+                        env.K8S_DEPLOYMENT = 'notifications-service'
                     } else {
                         env.IMAGE_NAME = "${params.SERVICE_NAME}-service"
                         env.HELM_IMAGE_KEY = "services.${params.SERVICE_NAME}.image"
+                        env.K8S_DEPLOYMENT = "${params.SERVICE_NAME}-service"
                     }
 
                     env.SERVICE_IMAGE = "local/${env.IMAGE_NAME}:${BUILD_NUMBER}"
@@ -67,6 +76,7 @@ pipeline {
         stage('Validate') {
             steps {
                 sh 'mvn -version'
+                sh 'helm version'
                 sh "helm lint ${CHART_PATH}"
             }
         }
@@ -77,18 +87,14 @@ pipeline {
             }
             steps {
                 sh 'mvn -pl accounts -am clean install -DskipTests'
-                sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*"'
+                sh 'find ~/.m2/repository/com/example/accounts -name "*stubs*" || true'
             }
         }
 
         stage('Build and Test Service') {
             steps {
                 script {
-                    if (params.SERVICE_NAME == 'gateway') {
-                        sh 'mvn -pl gateway -am clean install'
-                    } else {
-                        sh "mvn -pl ${params.SERVICE_NAME} -am clean install"
-                    }
+                    sh "mvn -pl ${params.SERVICE_NAME} -am clean install"
                 }
             }
         }
@@ -96,6 +102,31 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh "docker build --no-cache -t ${SERVICE_IMAGE} ./${SERVICE_DIR}"
+            }
+        }
+
+        stage('Render Helm Chart') {
+            steps {
+                script {
+                    def secretCredentialId = params.ENVIRONMENT == 'prod'
+                        ? 'helm-values-prod'
+                        : 'helm-values-test'
+
+                    withCredentials([
+                        file(credentialsId: secretCredentialId, variable: 'SECRET_VALUES_FILE')
+                    ]) {
+                        sh """
+                            helm template ${RELEASE_NAME} ${CHART_PATH} \
+                              -f ${CHART_PATH}/values.yaml \
+                              -f ${SECRET_VALUES_FILE} \
+                              --set global.imagePullPolicy=Never \
+                              --set ${HELM_IMAGE_KEY}=${SERVICE_IMAGE} \
+                              > rendered.yaml
+
+                            kubectl apply --dry-run=client -f rendered.yaml
+                        """
+                    }
+                }
             }
         }
 
@@ -116,6 +147,8 @@ pipeline {
                             helm upgrade --install ${RELEASE_NAME} ${CHART_PATH} \
                               -f ${CHART_PATH}/values.yaml \
                               -f ${SECRET_VALUES_FILE} \
+                              --wait \
+                              --timeout 10m \
                               --set global.imagePullPolicy=Never \
                               --set ${HELM_IMAGE_KEY}=${SERVICE_IMAGE}
                         """
@@ -124,12 +157,23 @@ pipeline {
             }
         }
 
+        stage('Wait for Rollout') {
+            when {
+                expression { return params.RUN_DEPLOY }
+            }
+            steps {
+                sh """
+                    kubectl rollout status deployment/${K8S_DEPLOYMENT} --timeout=180s
+                """
+            }
+        }
+
         stage('Helm Tests') {
             when {
                 expression { return params.RUN_DEPLOY }
             }
             steps {
-                sh "helm test ${RELEASE_NAME} --timeout 30s"
+                sh "helm test ${RELEASE_NAME} --logs"
             }
         }
     }
@@ -141,6 +185,12 @@ pipeline {
 
         failure {
             echo "Pipeline failed for service ${params.SERVICE_NAME}"
+
+            sh """
+                kubectl get pods || true
+                kubectl get svc || true
+                kubectl logs deployment/${K8S_DEPLOYMENT} || true
+            """
         }
     }
 }

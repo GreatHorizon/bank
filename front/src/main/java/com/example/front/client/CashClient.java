@@ -1,5 +1,6 @@
 package com.example.front.client;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
@@ -12,10 +13,15 @@ public class CashClient {
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final RestClient restClient;
 
-    public CashClient(OAuth2AuthorizedClientService authorizedClientService) {
+    public CashClient(
+            OAuth2AuthorizedClientService authorizedClientService,
+            RestClient.Builder restClientBuilder,
+            @Value("${app.gateway.base-url}")
+            String gatewayBaseUrl
+    ) {
         this.authorizedClientService = authorizedClientService;
-        this.restClient = RestClient.builder()
-                .baseUrl("http://localhost:30080")
+        this.restClient = restClientBuilder
+                .baseUrl(gatewayBaseUrl)
                 .build();
     }
 
@@ -37,21 +43,13 @@ public class CashClient {
         String accessToken = getAccessToken(authentication);
 
         restClient.put()
-
                 .uri(uriBuilder -> uriBuilder
-
                         .path("/api/cash")
-
                         .queryParam("amount", amount)
-
                         .build())
-
                 .headers(headers -> headers.setBearerAuth(accessToken))
-
                 .retrieve()
-
                 .toBodilessEntity();
-
     }
 
     private String getAccessToken(Authentication authentication) {

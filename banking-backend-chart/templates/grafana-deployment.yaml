@@ -1,0 +1,76 @@
+{{- if and .Values.global.grafana .Values.global.grafana.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.global.grafana.name }}
+  labels:
+    app: {{ .Values.global.grafana.name }}
+    {{- include "banking-backend.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.global.grafana.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.global.grafana.name }}
+    spec:
+      containers:
+        - name: {{ .Values.global.grafana.name }}
+          image: {{ .Values.global.grafana.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ .Values.global.grafana.port }}
+
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: {{ .Values.global.grafana.adminUser | quote }}
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: {{ .Values.global.grafana.adminPassword | quote }}
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Admin"
+
+          volumeMounts:
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/datasources/prometheus-datasource.yml
+              subPath: prometheus-datasource.yml
+
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards/dashboards.yml
+              subPath: dashboards.yml
+
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards/json/business-metrics.json
+              subPath: business-metrics.json
+
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards/json/http-metrics.json
+              subPath: http-metrics.json
+
+            - name: grafana-config
+              mountPath: /etc/grafana/provisioning/dashboards/json/jvm-metrics.json
+              subPath: jvm-metrics.json
+
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+
+      volumes:
+        - name: grafana-config
+          configMap:
+            name: {{ .Values.global.grafana.name }}-config
+{{- end }}

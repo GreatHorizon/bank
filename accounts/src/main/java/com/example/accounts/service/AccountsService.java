@@ -5,6 +5,8 @@ import com.example.accounts.model.Account;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,8 @@ public class AccountsService {
     private final AccountsRepository accountsRepository;
     private final NotificationsClient notificationsClient;
 
+    private static final Logger log = LoggerFactory.getLogger(AccountsService.class);
+
     public AccountsService(AccountsRepository accountsRepository, NotificationsClient notificationsClient) {
         this.accountsRepository = accountsRepository;
         this.notificationsClient = notificationsClient;
@@ -30,6 +34,8 @@ public class AccountsService {
         int years = Period.between(createAccountDto.birthDate(), today).getYears();
 
         if (years < 18) {
+            log.warn("Invalid age: years={}", years);
+
             throw new IllegalArgumentException("User must be at least 18 years old");
         }
 
@@ -45,12 +51,25 @@ public class AccountsService {
                         )
                 );
 
+        final var existingAccount = account.getId() != null;
+
         account.setFirstName(nameParts.firstName());
         account.setLastName(nameParts.lastName());
         account.setBirthDate(createAccountDto.birthDate());
-        account.setBalance(0L);
+
+        if (existingAccount) {
+            log.info("Account profile updated without balance reset: login={}, balance={}",
+                    login, account.getBalance());
+
+        } else {
+            log.info("Account created: login={}", login);
+            account.setBalance(0L);
+        }
 
         accountsRepository.save(account);
+
+
+        log.info("Sending cash createAccount notification: login={}", login);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -74,11 +93,14 @@ public class AccountsService {
                 .stream()
                 .map(model ->
                         new AccountForTransferDto(
-                                model.getLogin(),
-                                model.getFirstName(),
-                                model.getLastName()
+                                model.login(),
+                                model.firstName(),
+                                model.lastName()
                         )
                 ).toList();
+
+
+        log.info("Sending cash getAccountsForTransfer notification: login={}", login);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -93,6 +115,9 @@ public class AccountsService {
 
     public Long getBalance(String login) {
         final var balance = accountsRepository.findBalanceByLogin(login);
+
+        log.info("Sending cash getBalance notification: login={}", login);
+
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -109,17 +134,19 @@ public class AccountsService {
     @Transactional
     public void putCash(String login, Long amount) {
         if (amount == null || amount <= 0) {
+            log.warn("Invalid put cash amount: login={}, amount={}", login, amount);
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
-        Account account = accountsRepository.findByLogin(login)
-                .orElseThrow(() -> new AccountNotFoundException(login));
+        final var depositedRows = accountsRepository.deposit(login, amount);
 
-        final var newBalance = account.getBalance() + amount;
+        if (depositedRows == 0) {
+            log.warn("Account not found for transfer: login={}", login);
 
-        account.setBalance(newBalance);
+            throw new AccountNotFoundException(login);
+        }
 
-        accountsRepository.save(account);
+        log.info("Sending cash putCash notification: login={}", login);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -131,21 +158,29 @@ public class AccountsService {
         );
     }
 
+
     @Transactional
     public void getCash(String login, Long amount) {
         if (amount == null || amount <= 0) {
+            log.warn("Invalid get cash amount: login={}, amount={}", login, amount);
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
         if (accountsRepository.findByLogin(login).isEmpty()) {
+            log.error("Invalid account in get cash: login={}, amount={}", login, amount);
+
             throw new AccountNotFoundException(login);
         }
 
         final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(login, amount);
 
         if (withdrawnRows == 0) {
+            log.warn("Invalid get cash amount: login={}, amount={}", login, amount);
+
             throw new IllegalArgumentException("Недостаточно средств");
         }
+
+        log.info("Sending cash getCash notification: login={}", login);
 
         notificationsClient.sendNotification(
                 new NotificationDto(
@@ -163,28 +198,40 @@ public class AccountsService {
         final var toLogin = transferMoneyDto.login();
 
         if (transferAmount == null || transferAmount <= 0) {
+            log.warn("Invalid transfer amount: login={}, amount={}", transferMoneyDto.login(), transferMoneyDto.amount());
+
             throw new IllegalArgumentException("Сумма должна быть больше нуля");
         }
 
         if (accountsRepository.findByLogin(fromLogin).isEmpty()) {
+            log.warn("Account not found for transfer: fromLogin={}", fromLogin);
+
             throw new AccountNotFoundException(fromLogin);
         }
 
         if (accountsRepository.findByLogin(toLogin).isEmpty()) {
+            log.warn("Account not found for transfer: toLogin={}", toLogin);
+
             throw new AccountNotFoundException(toLogin);
         }
 
         final var withdrawnRows = accountsRepository.withdrawIfEnoughMoney(fromLogin, transferAmount);
 
         if (withdrawnRows == 0) {
+            log.warn("Not enough money: transferAmount={}", transferAmount);
+
             throw new IllegalArgumentException("Недостаточно средств");
         }
 
         final var depositedRows = accountsRepository.deposit(toLogin, transferAmount);
 
         if (depositedRows == 0) {
+            log.warn("Account not found for transfer: toLogin={}", toLogin);
+
             throw new AccountNotFoundException(toLogin);
         }
+
+        log.info("Sending cash transfer notification: login={}", transferMoneyDto.login());
 
         notificationsClient.sendNotification(
                 new NotificationDto(

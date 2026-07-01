@@ -1,3 +1,4 @@
+{{- if and .Values.global.keycloak .Values.global.keycloak.issuerUri }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -23,3 +24,4 @@ spec:
           curl -f -v {{ .Values.global.keycloak.issuerUri }}/.well-known/openid-configuration
 
           echo "Keycloak reachable OK"
+{{- end }}

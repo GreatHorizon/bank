@@ -1,5 +1,39 @@
 server:
-  port: 8084
+  port: ${SERVER_PORT:8084}
+
+app:
+  gateway:
+    base-url: ${APP_GATEWAY_BASE_URL:http://localhost:30080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        http.client.requests: 0.5, 0.95, 0.99
+  tracing:
+    sampling:
+      probability: 1.0
+    export:
+      zipkin:
+        enabled: true
+        endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:http://localhost:30411/api/v2/spans}
 
 spring:
   application:
@@ -18,13 +52,6 @@ spring:
               - email
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-
         provider:
           keycloak:
-            issuer-uri: ${KEYCLOAK_ISSUER_URI}
-
-logging:
-  level:
-    org.springframework.web.client.RestClient: DEBUG
-    org.springframework.web.client.RestTemplate: DEBUG
-    org.springframework.security: DEBUG
+            issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI}

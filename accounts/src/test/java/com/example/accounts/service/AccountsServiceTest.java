@@ -2,6 +2,7 @@ package com.example.accounts.service;
 
 import com.example.accounts.error.AccountNotFoundException;
 import com.example.accounts.model.Account;
+import com.example.accounts.projection.AccountForTransferProjection;
 import com.example.accounts.repository.AccountsRepository;
 import com.example.shared.client.NotificationsClient;
 import com.example.shared.dto.AccountDto;
@@ -60,13 +61,16 @@ class AccountsServiceTest {
     }
 
     @Test
-    void createAccountUpdatesExistingAccount() {
+    void createAccountUpdatesExistingAccountWithoutBalance() {
         Account existing = new Account(
                 "john",
                 "Old",
                 "Name",
                 LocalDate.of(1990, 1, 1)
         );
+
+        existing.setId(1L);
+
         existing.setBalance(999L);
 
         CreateAccountDto dto = new CreateAccountDto(
@@ -83,7 +87,7 @@ class AccountsServiceTest {
         assertEquals("John", existing.getFirstName());
         assertEquals("Smith", existing.getLastName());
         assertEquals(dto.birthDate(), existing.getBirthDate());
-        assertEquals(0L, existing.getBalance());
+        assertNotEquals(0L, existing.getBalance());
 
         verify(notificationsClient).sendNotification(any());
     }
@@ -138,18 +142,16 @@ class AccountsServiceTest {
 
     @Test
     void getAccountsForTransferReturnsOtherAccounts() {
-        Account anna = new Account(
+        AccountForTransferProjection anna = new AccountForTransferProjection(
                 "anna",
                 "Anna",
-                "Ivanova",
-                LocalDate.of(1995, 1, 1)
+                "Ivanova"
         );
 
-        Account petr = new Account(
+        AccountForTransferProjection petr = new AccountForTransferProjection(
                 "petr",
                 "Petr",
-                "Petrov",
-                LocalDate.of(1993, 2, 2)
+                "Petrov"
         );
 
         when(accountsRepository.findOtherAccountsByLogin("john"))
@@ -183,21 +185,14 @@ class AccountsServiceTest {
 
     @Test
     void putCashIncreasesBalance() {
-        Account account = new Account(
-                "john",
-                "John",
-                "Smith",
-                LocalDate.of(1990, 1, 1)
-        );
-        account.setBalance(100L);
-
-        when(accountsRepository.findByLogin("john")).thenReturn(Optional.of(account));
+        when(accountsRepository.deposit("john", 50L)).thenReturn(1);
 
         accountsService.putCash("john", 50L);
 
-        assertEquals(150L, account.getBalance());
+        verify(accountsRepository).deposit("john", 50L);
+        verify(accountsRepository, never()).findByLogin(any());
+        verify(accountsRepository, never()).save(any());
 
-        verify(accountsRepository).save(account);
         verify(notificationsClient).sendNotification(any());
     }
 
@@ -216,8 +211,6 @@ class AccountsServiceTest {
 
     @Test
     void putCashThrowsIfAccountNotFound() {
-        when(accountsRepository.findByLogin("john")).thenReturn(Optional.empty());
-
         assertThrows(
                 AccountNotFoundException.class,
                 () -> accountsService.putCash("john", 50L)
