@@ -36,6 +36,14 @@ public class NotificationClientConfig {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
 
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 1000);
+        props.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, 120000);
+        props.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 30000);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+
         return new DefaultKafkaProducerFactory<>(props);
     }
 
